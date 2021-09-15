@@ -28,3 +28,5 @@ Generate a sample video:
 `python3 generate_qr_video.py`  
 Assuming you are auth'd to an AWS account, create stack for infrastructure. You will want to override the default bucket name with something else:  
 `aws cloudformation --template-file bucket_setup.yaml --stack-name <YOUR STACK NAME> --parameter-overrides BucketName=<YOUR BUCKET NAME HERE>`  
+Upload file to S3:  
+`aws s3 cp <video_file_name> s3://<YOUR BUCKET NAME>/test.mp4`
