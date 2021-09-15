@@ -1,9 +1,17 @@
 AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  BucketName:
+    Default: bucket-for-video-analysis
+    Type: String
+    Description: Name of bucket to be created
+
 Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: bucket-for-video-analysis
+      BucketName:
+        Ref: BucketName
       AccessControl: PublicRead
       WebsiteConfiguration:
         IndexDocument: index.html
@@ -22,7 +30,7 @@ Resources:
             Principal:
               AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOriginIdentity}'
             Action: 's3:GetObject'
-            Resource: arn:aws:s3:::bucket-for-video-analysis/*
+            Resource: !Sub 'arn:aws:s3:::${BucketName}/*'
       Bucket: !Ref S3Bucket
 
   CloudFrontOriginIdentity:
@@ -37,7 +45,7 @@ Resources:
       DistributionConfig:
         Origins:
           - DomainName: bucket-for-video-analysis.s3.amazonaws.com
-            Id: S3-bucket-for-video-analysis
+            Id: !Sub 'S3-${BucketName}'
             S3OriginConfig:
               OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginIdentity}'
         Enabled: 'true'
@@ -46,7 +54,7 @@ Resources:
           AllowedMethods:
             - GET
             - HEAD
-          TargetOriginId: S3-bucket-for-video-analysis
+          TargetOriginId: !Sub 'S3-${BucketName}'
           ForwardedValues:
             QueryString: 'false'
             Cookies:
