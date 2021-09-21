@@ -30,3 +30,8 @@ Assuming you are auth'd to an AWS account, create stack for infrastructure. You 
 `aws cloudformation --template-file bucket_setup.yaml --stack-name <YOUR STACK NAME> --parameter-overrides BucketName=<YOUR BUCKET NAME HERE>`  
 Upload file to S3:  
 `aws s3 cp <video_file_name> s3://<YOUR BUCKET NAME>/test.mp4`
+
+### Next steps - towards the livestream generation side of the project
+1. Stream a canned video through FFMPEG->FFServer
+2. Stream a live video through FFMPEG->FFServer
+3. Generate the container spec for this whole pipeline
