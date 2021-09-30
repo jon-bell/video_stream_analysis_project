@@ -3,9 +3,11 @@ import os
 import cv2
 from typing import List
 import qrcode
+from qrcode.image.pil import PilImage
+import numpy
 
 now = datetime.datetime.now()
-DEFAULT_VIDEO_NAME = "qr_code_video_" + str(now.minute) + str(now.second) + str(now.microsecond) + ".mp4"
+DEFAULT_VIDEO_NAME = "qr_code_video_" + str(now.minute) + str(now.second) + str(now.microsecond) + ".avi"
 
 def generate_qr_codes_and_video(destination_folder: str, sequences, fps, video_name: str=DEFAULT_VIDEO_NAME) -> None:
     """
@@ -64,5 +66,30 @@ def create_sequenced_qr_codes(sequences: int, file_name_base: str, destination: 
         file_name = destination + f"/{full_file_name}.png"
         new_qr_code.save(file_name)
 
+def create_sequenced_qr_codes_in_memory(sequences: int, sleep_between_frames: float=0.0) -> List[PilImage]:
+    """
+    Cretes a sequence of QR codes in a destination folder. Each QR code when scanned will have information about the
+    time, the number it is in the sequence, and the time between frames
+    :param sequences: number of qr codes to generate
+    :param destination: folder destination
+    :param file_name_base: name of the file. Will be named destination/file_name_base_{file_name_base}
+    :param sleep_between_frames: float number of seconds to increment the timestamp. It doesn't actually sleep when
+    creating QR codes
+    """
+    starting_time = datetime.datetime.now()
+    qr_codes = []
+    for i in range(sequences):
+        time_now = starting_time + datetime.timedelta(seconds=i * sleep_between_frames)
+        data = {"time_now": time_now, "image_increment":i, "time_increment_per_frame":sleep_between_frames}
+        qr_code = qrcode.QRCode(version=1)
+        qr_code.add_data(data=data)
+        qr_code.make()
+        image = qr_code.make_image(fill_color="black", back_color="white")
+        test_image = image.get_image()
+        test_convert = cv2.cvtColor(numpy.array(test_image), cv2.COLOR_RGB2BGR)
+        qr_codes.append()
+    return qr_codes
+
 if __name__ == '__main__':
-    generate_qr_codes_and_video("new_codes_3", 1000, 20.0)
+    generate_qr_codes_and_video("temp_files", 1000, 20, "video_test.mp4")
+    print("test!")

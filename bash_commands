@@ -1,0 +1,7 @@
+pip install aiortc
+python3 stream_video.py
+pip install starlette
+python3 stream_video.py
+pip install jinja2
+python3 stream_video.py
+history

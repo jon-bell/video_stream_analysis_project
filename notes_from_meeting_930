@@ -1,0 +1,6 @@
+* Want to get it full running in docker
+* Want to get live generating videos going
+* Look into ways to programatically receive the stream and analyze the video
+* Good starting point "Using WebGear_RTC with a Custom Source(OpenCV)" part of https://abhitronix.github.io/vidgear/v0.2.2-stable/gears/webgear_rtc/advanced/
+    * It seems to be manipualting the frames - can we instead replace the frames to do live generating?
+

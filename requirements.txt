@@ -1,0 +1,7 @@
+opencv-python-headless
+vidgear
+uvicorn
+jinja2
+starlette
+aiortc
+qrcode
