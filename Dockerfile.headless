@@ -5,7 +5,13 @@ WORKDIR /code
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY stream_video.py .
+COPY vidgear_rtc.py .
 COPY generate_qr_video.py .
 
-CMD ["python", "video_stream.py"]
+COPY video_test.mp4 .
+EXPOSE 8081
+
+# Running this with --network=host
+# If i dont run with any network command doesnt work
+
+CMD ["python", "vidgear_rtc.py"]
