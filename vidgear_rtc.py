@@ -5,9 +5,39 @@ from aiortc import VideoStreamTrack
 from aiortc.mediastreams import MediaStreamError
 from vidgear.gears.asyncio import WebGear_RTC
 from vidgear.gears.asyncio.helper import reducer
+from vidgear.gears import ScreenGear
+
 import qrcode
 # initialize WebGear_RTC app without any source
 web = WebGear_RTC(logging=True)
+
+# create your own custom frame producer
+async def my_frame_producer():
+    options = {"top": 40, "left": 0, "width": 300, "height": 300}
+    stream = ScreenGear(monitor=1, logging=True, **options).start()
+    # loop over frames
+    while True:
+        # read frame from provided source
+        (grabbed, frame) = stream.read()
+        # break if NoneType
+        if not grabbed:
+            break
+
+        # do something with your OpenCV frame here
+
+        # reducer frames size if you want more performance otherwise comment this line
+        frame = await reducer(frame, percentage=30)  # reduce frame by 30%
+        # handle JPEG encoding
+        encodedImage = cv2.imencode(".jpg", frame)[1].tobytes()
+        # yield frame in byte format
+        yield (b"--frame\r\nContent-Type:video/jpeg2000\r\n\r\n" + encodedImage + b"\r\n")
+        await asyncio.sleep(0.00001)
+    # close stream
+    stream.release()
+
+
+# add your custom frame producer to config
+web.config["generator"] = my_frame_producer
 
 # create your own Bare-Minimum Custom Media Server
 class Custom_RTCServer(VideoStreamTrack):
@@ -16,13 +46,14 @@ class Custom_RTCServer(VideoStreamTrack):
     to aiortc's VideoStreamTrack.
     """
 
-    def __init__(self, source=None):
+    def __init__(self, source=None, test_stream=None):
 
         # don't forget this line!
         super().__init__()
 
         # initialize global params
         self.stream = cv2.VideoCapture(source)
+        self.test_stream = test_stream
 
     async def recv(self):
         """
@@ -63,12 +94,15 @@ class Custom_RTCServer(VideoStreamTrack):
             self.stream.release()
             self.stream = None
 
+# open video stream with defined parameters
+
 
 # assign your custom media server to config with adequate source (for e.g. foo.mp4)
-web.config["server"] = Custom_RTCServer(source="video_test.mp4")
+# web.config["server"] = Custom_RTCServer(source="Output.mp4", test_stream=stream)
+web.config["server"] = Custom_RTCServer(source="Output.mp4", test_stream=stream)
 
 # run this app on Uvicorn server at address http://localhost:8000/
-uvicorn.run(web(), host="0.0.0.0", port=8081)
+uvicorn.run(web(), host="localhost", port=8000)
 
 # close app safely
 web.shutdown()
