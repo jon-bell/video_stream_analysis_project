@@ -1,52 +1,47 @@
-# import required libraries
-from vidgear.gears import ScreenGear
 from vidgear.gears import StreamGear
 import cv2
 import qrcode
 import time
 import random
+import threading
 
-# open any valid video stream(for e.g `foo1.mp4` file)
-options = {"top": 40, "left": 0, "width": 300, "height": 300}
-stream = ScreenGear(monitor=1, logging=True, **options).start()
+DEFAULT_FRAMERATE = 25.0
 
-# describe a suitable manifest-file location/name
-options_stream = {"-livestream": True}
-streamer = StreamGear(output="video\\stream.m3u8", format = "hls", **options_stream)
+def start_stream(framerate: float=DEFAULT_FRAMERATE, output: str="video\\stream.m3u8", stream_frame_limit: int=None) -> None:
+    """
+    Starts streaming qr code video to network stream
+    """
+    options_stream = {"-livestream": True, "-input_framerate": framerate}
+    streamer = StreamGear(output=output, format="hls", **options_stream)
+    counter = 0
+    while True:
+        qr_code_data = {"frame_number": counter, "time": time.time(), "random": random.random()}
+        qr_code = qrcode.make(data=qr_code_data)
+        qr_code.save("temp.png")
+        frame = cv2.imread("temp.png")
+        streamer.stream(frame)
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord("q"):
+            print("Stream manually terminated. Ending now...")
+            break
+        if stream_frame_limit is not None and counter > stream_frame_limit:
+            print(f"Ending stream because {counter} frames have been sent")
+            break
+        counter += 1
+    streamer.terminate()
 
-# loop over
-counter = 0
-while True:
+class StreamThread(threading.Thread):
 
-    # read frames from stream
-    data = {"frame_number": counter, "time": time.time(), "random": random.random()}
-    qr_code = qrcode.make(data=data)
-    qr_code.save("temp.png")
-    image = cv2.imread("temp.png")
-    frame = image #stream.read()
+    def __init__(self, frame_limit: int = 10000, frame_rate: float=DEFAULT_FRAMERATE):
+        super().__init__()
+        self.frame_limit = frame_limit
+        self.frame_rate = frame_rate
 
-    # check for frame if Nonetype
-    if frame is None:
-        break
-
-    streamer.stream(frame)
-
-    # Show output window
-    cv2.imshow("Output Frame", frame)
-
-    # check for 'q' keyq if pressed
-    key = cv2.waitKey(1) & 0xFF
-    if key == ord("q"):
-        break
-    counter += 1
-# close output window
-cv2.destroyAllWindows()
-
-# safely close video stream
-stream.stop()
-
-# safely close streamer
-streamer.terminate()
+    def run(self) -> None:
+        print("Starting stream")
+        start_stream(framerate=self.frame_rate, stream_frame_limit=self.frame_limit)
+        print("Stream has ended")
 
 if __name__ == '__main__':
-    print("test")
+    start_stream()
+
