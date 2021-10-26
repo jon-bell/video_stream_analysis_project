@@ -1,0 +1,15 @@
+FROM python:3.7-slim
+
+WORKDIR /opt/build
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+RUN pip install opencv-python
+RUN apt-get update && apt-get install -y ffmpeg
+RUN mkdir video
+COPY streamgear_test.py .
+COPY flask_server.py .
+RUN pip install flask
+COPY wrapper.sh .
+# CMD ["tail", "-f", "/dev/null"]
+ENTRYPOINT ["sh", "wrapper.sh"]
