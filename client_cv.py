@@ -2,7 +2,7 @@ import cv2
 import sys
 import pandas as pd
 import time
-from streamgear_test import StreamThread
+from src.streamgear_test import StreamThread
 import threading
 import json
 import os
@@ -54,8 +54,8 @@ class StreamAnalyzer:
             try:
                 values = json.loads(values)
             except json.decoder.JSONDecodeError:
-                print("Failed to decode frame")
-                cv2.imshow(f"Test_window_{frames_recorded_counter}", frame)
+                # print("Failed to decode frame")
+                # cv2.imshow(f"Test_window_{frames_recorded_counter}", frame)
                 cv2.waitKey(wait_ms)
                 continue
             frame_number = values['frame_number']

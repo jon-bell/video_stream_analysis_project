@@ -4,4 +4,3 @@ Fargate notes:
 * Client should be running from the same management point
     * Maybe makes sense to run either on fargate on ec2 or something
     * VM accessible through school
-*

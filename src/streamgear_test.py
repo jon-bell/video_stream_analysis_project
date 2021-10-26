@@ -20,7 +20,7 @@ def start_stream(framerate: float=DEFAULT_FRAMERATE, output: str="video\\stream.
         qr_code.save("temp.png")
         frame = cv2.imread("temp.png")
         streamer.stream(frame)
-        key = cv2.waitKey(1) & 0xFF
+        key = cv2.waitKey(1)
         if key == ord("q"):
             print("Stream manually terminated. Ending now...")
             break
