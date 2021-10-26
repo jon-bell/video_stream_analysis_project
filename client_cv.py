@@ -1,12 +1,9 @@
 import cv2
-import sys
 import pandas as pd
 import time
 from src.streamgear_test import StreamThread
-import threading
 import json
-import os
-import pickle
+
 
 DEFAULT_VIDEO_URL = "http://127.0.0.1:5000/video/stream.m3u8"
 
