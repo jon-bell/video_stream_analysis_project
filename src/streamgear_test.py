@@ -43,7 +43,5 @@ class StreamThread(threading.Thread):
         print("Stream has ended")
 
 if __name__ == '__main__':
-    test_thread = StreamThread()
-    test_thread.start()
-    test_thread.join()
+    start_stream()
 
