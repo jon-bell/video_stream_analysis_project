@@ -1,7 +1,6 @@
 import cv2
 import pandas as pd
 import time
-from src.streamgear_test import StreamThread
 import json
 import sqlite3
 from typing import List
@@ -135,14 +134,11 @@ class StreamAnalyzer:
         fps = video_capture.get(cv2.CAP_PROP_FPS)
         print(f"FPS received: {fps}")
         wait_ms = int(1000/fps)
-        qr_decoder = cv2.QRCodeDetector()
         frames_recorded_counter, frames_received_counter = 0, 0
         count_thread = 0
         while True:
             start_loop = time.time()
             ret, frame = video_capture.read()
-            if frame is None:
-                break
             self.frames_buffer.append(FrameRecorder(frame=frame, time=time.time(),
                                                     frame_received_counter=frames_recorded_counter,
                                                     analysis_number=self.analysis_number))
@@ -173,6 +169,9 @@ class StreamAnalyzer:
         sql_query = f"SELECT * FROM {self.table_name} where analysis_number = {self.analysis_number}"
         data = pd.read_sql(sql_query, connection)
         data.sort_values(by=["frame_number"])
+        first_frame_received = data['frame_number'].iloc[0]
+        data['frame_number_index_to_0'] = data['frame_number'] - first_frame_received
+        data['frames_dropped'] = data['frame_number_received'] - data.index
         data['time_difference'] = data['time_received'] - data['time_generated']
         data['difference_between_frame_times'] = data['time_received'].rolling(2).apply(lambda x: x.iloc[1] - x.iloc[0])
         data['calculated_fps'] = 1000 / (data['difference_between_frame_times'] * 1000)
@@ -194,4 +193,4 @@ class StreamAnalyzer:
 
 if __name__ == '__main__':
     streamer = StreamAnalyzer()
-    streamer.run_and_analyze_stream(frame_limit=1000)
+    streamer.run_and_analyze_stream(frame_limit=200)
