@@ -1,0 +1,18 @@
+                                                             Things we wana log in v2
+* Push frames into buffer and have worker threads to process them
+    * Will want to use a thread pool buffer
+    * concurrent.futures.ThreadPoolExecutor()
+    * Check out link professor bell has on from DO other sources
+        * https://www.digitalocean.com/community/tutorials/how-to-use-threadpoolexecutor-in-python-3
+* Log FPS every minute
+    * Amount of frames received in every minute / 60
+* Log dropped frames
+* Clock drift
+    * max and min clock drift over a minute
+* Try and run for a few hours see what happens
+* Make logging changes first
+* Could put the Fargate/ Task configuration into VCS
+* One click deployment if possible
+* For FPS issue:
+    * Is the issue at the server level or client level?
+           * Connect VLC or something similar and get their reading
