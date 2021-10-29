@@ -150,10 +150,11 @@ class StreamAnalyzer:
             recorder_thread.start()
             count_thread += 1
             end_loop = time.time()
-            loop_time = (end_loop - start_loop)
+            loop_time = (end_loop - start_loop) * 1000
             wait_time = wait_ms - loop_time
             print(f"# of active threads: {active_count()}")
-            print(f"loop time: {loop_time * 1000}")
+            print(f"loop time: {loop_time}")
+            print(f"Wait time {wait_time}")
             cv2.waitKey(int(wait_time))
 
     def analyze_stream(self) -> pd.DataFrame:
@@ -168,7 +169,7 @@ class StreamAnalyzer:
         connection = sqlite3.connect(self.database_name)
         sql_query = f"SELECT * FROM {self.table_name} where analysis_number = {self.analysis_number}"
         data = pd.read_sql(sql_query, connection)
-        data.sort_values(by=["frame_number"])
+        data = data.sort_values(by=["frame_number"])
         first_frame_received = data['frame_number'].iloc[0]
         data['frame_number_index_to_0'] = data['frame_number'] - first_frame_received
         data['frames_dropped'] = data['frame_number_received'] - data.index
@@ -193,4 +194,4 @@ class StreamAnalyzer:
 
 if __name__ == '__main__':
     streamer = StreamAnalyzer()
-    streamer.run_and_analyze_stream(frame_limit=200)
+    streamer.run_and_analyze_stream(frame_limit=1000)
