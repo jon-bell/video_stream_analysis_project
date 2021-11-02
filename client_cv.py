@@ -31,12 +31,20 @@ class FrameRecorder:
     time: float
     analysis_number: int
 
-    def process_frame(self, db_name: str, table_name: str="stream_data"):
+    def process_frame(self, db_name: str, table_name: str="stream_data", no_logging: bool=False):
         """
         Decodes frames and puts them into SQL database
         """
         qr_decoder = cv2.QRCodeDetector()
-        original_val, pts, st_code = qr_decoder.detectAndDecode(self.frame)
+        try:
+            original_val, pts, st_code = qr_decoder.detectAndDecode(self.frame)
+        except cv2.error as e:
+            print(f"Frame dropped! Frame number {self.frame_received_counter}")
+            cv2.imwrite(f"frame/frame_{self.frame_received_counter}.png", self.frame)
+            raise e
+            return
+        if no_logging:
+            return
         values = original_val.replace("'", '"')
         try:
             values = json.loads(values)
@@ -57,14 +65,15 @@ class FrameRecorder:
 
 class RecorderThread(Thread):
 
-    def __init__(self, frame_recorder: FrameRecorder, db_name: str, table_name: str="stream_data"):
+    def __init__(self, frame_recorder: FrameRecorder, db_name: str, table_name: str="stream_data", no_logging: bool=False):
         super().__init__()
         self.frame_recorder = frame_recorder
         self.db_name = db_name
         self.table_name = table_name
+        self.no_logging = no_logging
 
     def run(self):
-        self.frame_recorder.process_frame(self.db_name, self.table_name)
+        self.frame_recorder.process_frame(self.db_name, self.table_name, no_logging=self.no_logging)
 
 class RecorderThreadExecutor(Thread):
     """
@@ -125,7 +134,7 @@ class StreamAnalyzer:
         print(f"Analysis number {self.analysis_number} set")
 
 
-    def get_stream_record_frames(self, limit_frames: int=None) -> None:
+    def get_stream_record_frames(self, limit_frames: int=None, no_logging: bool=False) -> None:
         """
         This function captures the network stream and records the information it receives into the video log
         :param limit_frames: number of frames to record for until breaking
@@ -146,15 +155,14 @@ class StreamAnalyzer:
             if limit_frames is not None and frames_recorded_counter > limit_frames:
                 print("Ending frames recording")
                 break
-            recorder_thread = RecorderThread(frame_recorder=self.frames_buffer.pop(), db_name=self.database_name, table_name=self.table_name)
-            recorder_thread.start()
+            recorder_thread = RecorderThread(frame_recorder=self.frames_buffer.pop(), db_name=self.database_name, table_name=self.table_name, no_logging=no_logging)
+            if frames_received_counter % 2 == 0:
+                recorder_thread.start()
             count_thread += 1
             end_loop = time.time()
             loop_time = (end_loop - start_loop) * 1000
             wait_time = wait_ms - loop_time
-            print(f"# of active threads: {active_count()}")
-            print(f"loop time: {loop_time}")
-            print(f"Wait time {wait_time}")
+            print("wait ms: ", wait_time)
             cv2.waitKey(int(wait_time))
 
     def analyze_stream(self) -> pd.DataFrame:
@@ -178,7 +186,7 @@ class StreamAnalyzer:
         data['calculated_fps'] = 1000 / (data['difference_between_frame_times'] * 1000)
         return data
 
-    def run_and_analyze_stream(self, frame_limit: int=2000, outfile: str="data.csv") -> None:
+    def run_and_analyze_stream(self, frame_limit: int=2000, outfile: str="data.csv", no_logging=False) -> None:
         """
         This function runs the whole pipeline of running the program that generates and streams the qrcode network
         stream video in a separate thread, then starts receiving and recording the data from the frames, and finally
@@ -186,7 +194,7 @@ class StreamAnalyzer:
         :param frame_limit: Number of frames to give for the stream and stream recorder. i.e. if 2000 is given,
         then it will process 2000 frames before
         """
-        self.get_stream_record_frames(limit_frames=frame_limit) # Start recording frames
+        self.get_stream_record_frames(limit_frames=frame_limit, no_logging=no_logging) # Start recording frames
         analyzed_data = self.analyze_stream() # Post processing
         if outfile is not None:
             analyzed_data.to_csv(outfile)
@@ -194,4 +202,4 @@ class StreamAnalyzer:
 
 if __name__ == '__main__':
     streamer = StreamAnalyzer()
-    streamer.run_and_analyze_stream(frame_limit=1000)
+    streamer.run_and_analyze_stream(frame_limit=1000, no_logging=True)
