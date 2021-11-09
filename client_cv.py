@@ -8,8 +8,39 @@ from numpy import ndarray
 from dataclasses import dataclass
 from threading import Thread, active_count
 from concurrent.futures import ThreadPoolExecutor
+import boto3
 
-DEFAULT_VIDEO_URL = "http://127.0.0.1:5000/video/stream.m3u8"
+def get_public_ip_ecs_task(cluster_name: str="StreamingClusterCluster") -> str:
+    """
+    Gets the public IP to connect to for an ecs task
+    :param stack_name: name of the stack it's all deployed in... May e a better way to do this
+    :return: the public ip of the ecs container
+    """
+    ecs_client, ec2_client = boto3.client("ecs"), boto3.client("ec2")
+    tasks = ecs_client.list_tasks(cluster=cluster_name)['taskArns']
+    if not tasks:
+        raise AssertionError(f"No tasks associated with cluster {cluster_name}")
+    task_arn = tasks[0] # For now will just use the first one
+    task_descriptions = ecs_client.describe_tasks(tasks=[task_arn], cluster=cluster_name)
+    attachments = task_descriptions['tasks'][0]['attachments']
+    eni_id = None
+    for attach in attachments:
+        attach_type = attach['type']
+        if attach_type == "ElasticNetworkInterface":
+            details = attach['details']
+            for det in details:
+                if det['name'] == "networkInterfaceId":
+                    eni_id = det['value']
+                    break
+            break
+    if eni_id is None:
+        raise AssertionError(f"ENI ID not found for task {task_arn} in cluster {cluster_name}")
+    network_interfaces = ec2_client.describe_network_interfaces(NetworkInterfaceIds=[eni_id])['NetworkInterfaces']
+    public_ip = network_interfaces[0]['Association']['PublicIp']
+    return public_ip
+
+# DEFAULT_VIDEO_URL = "http://127.0.0.1:5000/video/stream.m3u8"
+DEFAULT_VIDEO_URL = f"http://{get_public_ip_ecs_task()}:5000/video/stream.m3u8"
 
 """
 What I'm trying to understand:
@@ -203,3 +234,4 @@ class StreamAnalyzer:
 if __name__ == '__main__':
     streamer = StreamAnalyzer()
     streamer.run_and_analyze_stream(frame_limit=1000, no_logging=True)
+    print(get_public_ip_ecs_task())

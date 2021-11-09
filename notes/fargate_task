@@ -1,0 +1,3 @@
+* Put the fargate task and set up in IaC
+* Make it startable with a script or API call
+* Get IP -> run -> record parameters per batch
