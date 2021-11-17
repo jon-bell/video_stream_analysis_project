@@ -6,7 +6,7 @@ import sqlite3
 from typing import List
 from numpy import ndarray
 from dataclasses import dataclass
-from threading import Thread, active_count
+from threading import Thread
 from concurrent.futures import ThreadPoolExecutor
 import boto3
 
@@ -40,7 +40,9 @@ def get_public_ip_ecs_task(cluster_name: str="StreamingClusterCluster") -> str:
     return public_ip
 
 # DEFAULT_VIDEO_URL = "http://127.0.0.1:5000/video/stream.m3u8"
-DEFAULT_VIDEO_URL = f"http://{get_public_ip_ecs_task()}:5000/video/stream.m3u8"
+# DEFAULT_VIDEO_URL = f"http://{get_public_ip_ecs_task()}:5000/video/stream.m3u8"
+new_url = "10.110.126.188"
+DEFAULT_VIDEO_URL = f"http://{new_url}:5000/video/stream.m3u8"
 
 """
 What I'm trying to understand:
@@ -135,8 +137,19 @@ class StreamAnalyzer:
         self.frames_buffer: List[FrameRecorder] = []
         self.database_name = database_name
         self.table_name = table_name
-        self.analysis_number = None
+        self.analysis_number: int
+        self.create_metric_sql()
         self.set_up_sql()
+
+    @classmethod
+    def run(cls, local=True, cluster_name: str = "StreamingClusterCluster", ):
+        if local:
+            stream_url = "10.110.126.188"
+        else:
+            stream_url = get_public_ip_ecs_task(cluster_name)
+        stream_url =f"http://{stream_url}:5000/video/stream.m3u8"
+        stream_analyzer = StreamAnalyzer(stream_url=stream_url, **kwargs)
+        stream_analyzer.run_and_analyze_stream()
 
 
     def set_up_sql(self) -> None:
@@ -151,13 +164,30 @@ class StreamAnalyzer:
         self.set_analysis_number(cursor)
         connection.close()
 
+    def create_metric_sql(self) -> None:
+        """
+        Sets up a sqlite database to record the parameters of the test currently running which are
+        * CPU
+        * RAM
+        * Image size
+        * FPS
+        * Pre Recorded Video vs. Live Generated
+        * Analysis number: Links to stream_data table so that we can compare data accross the different runs
+        """
+        create_table_sql = "CREATE TABLE IF NOT EXISTS stream_params (cpu INT, ram INT, image_size INT, fps INT, video_type CHAR(255), analysis_number INT)"
+        connection = sqlite3.connect(self.database_name)
+        cursor = connection.cursor()
+        cursor.execute(create_table_sql)
+        connection.commit()
+        connection.close()
+
     def set_analysis_number(self, cursor: sqlite3.Cursor) -> None:
         """
         Sets an incrementing analysis number in the database. The database will store data from many differnt analysis
         periods, so it's important to be able to distinguish them.
         """
         sql = "SELECT max(analysis_number) from stream_data"
-        data = cursor.execute(sql).fetchall()[0][0]
+        data= cursor.execute(sql).fetchall()[0][0]
         if data is None:
             self.analysis_number = 0
         else:
@@ -204,6 +234,7 @@ class StreamAnalyzer:
         * Number of frames lost
         * Variation in time between frames received
         * Time difference between streamer and stream receiver
+        TODO: Disable this when no logging is set
         """
         connection = sqlite3.connect(self.database_name)
         sql_query = f"SELECT * FROM {self.table_name} where analysis_number = {self.analysis_number}"
@@ -232,6 +263,4 @@ class StreamAnalyzer:
 
 
 if __name__ == '__main__':
-    streamer = StreamAnalyzer()
-    streamer.run_and_analyze_stream(frame_limit=1000, no_logging=True)
-    print(get_public_ip_ecs_task())
+    print(get_public_ip_ecs_task("StreamingClusterCluster"))

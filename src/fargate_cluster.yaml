@@ -20,14 +20,13 @@ Resources:
       ClusterName: !Join [ '', [ !Ref ServiceName, Cluster ] ]
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
-    # Makes sure the log group is created before it is used.
     DependsOn: LogGroup
     Properties:
       NetworkMode: awsvpc
       ExecutionRoleArn: !Ref ExecutionRole
       RequiresCompatibilities:
         - FARGATE
-      Cpu: 512
+      Cpu: 512 # Try higher and lower CPUS
       Memory: 1GB
       TaskRoleArn: !Ref TaskRole
       ContainerDefinitions:
@@ -97,5 +96,22 @@ Resources:
           FromPort: !Ref ContainerPort
           ToPort: !Ref ContainerPort
           CidrIp: 0.0.0.0/0
+
+  ClientIamRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+#      Policies:
+#        - PolicyName: AllowGetEcsPublicIP
+#          Version: "2012-10-17"
+#          Statement:
 
 
