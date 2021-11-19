@@ -9,8 +9,11 @@ from dataclasses import dataclass
 from threading import Thread
 from concurrent.futures import ThreadPoolExecutor
 import boto3
+import argparse
+import datetime
+import requests
 
-def get_public_ip_ecs_task(cluster_name: str="StreamingClusterCluster") -> str:
+def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str="StreamingClusterCluster") -> str:
     """
     Gets the public IP to connect to for an ecs task
     :param stack_name: name of the stack it's all deployed in... May e a better way to do this
@@ -20,9 +23,18 @@ def get_public_ip_ecs_task(cluster_name: str="StreamingClusterCluster") -> str:
     tasks = ecs_client.list_tasks(cluster=cluster_name)['taskArns']
     if not tasks:
         raise AssertionError(f"No tasks associated with cluster {cluster_name}")
-    task_arn = tasks[0] # For now will just use the first one
-    task_descriptions = ecs_client.describe_tasks(tasks=[task_arn], cluster=cluster_name)
-    attachments = task_descriptions['tasks'][0]['attachments']
+    task_arn = tasks # For now will just use the first one
+    task_descriptions = ecs_client.describe_tasks(tasks=task_arn, cluster=cluster_name)['tasks']
+    attachments = None
+    for task in task_descriptions:
+        overrides_env: List[dict] = task['overrides']['containerOverrides'][0]['environment']
+        for env_vars in overrides_env:
+            if env_vars['name'] == "ID":
+                if env_vars['value'] == task_identifier:
+                    attachments = task['attachments']
+                    break
+    if not attachments:
+        raise AssertionError(f"No container found with matching ID {task_identifier}")
     eni_id = None
     for attach in attachments:
         attach_type = attach['type']
@@ -131,8 +143,10 @@ class StreamAnalyzer:
 
     COLUMN_NAMES = ["frame_number", "frame_number_recorded", "frame_number_received", "time_generated", "time_received", "random"]
 
-    def __init__(self, stream_url: str=DEFAULT_VIDEO_URL, database_name="stream_data.db", table_name: str="stream_data"):
-        self.stream_url = stream_url
+    def __init__(self, ip_address: str=DEFAULT_VIDEO_URL, database_name="stream_data.db",
+                 table_name: str="stream_data", port: int=5000, record_params: bool=True):
+        self.server_url = f"http://{ip_address}:{port}/"
+        self.stream_url = self.server_url + "video/stream.m3u8"
         self.video_log: pd.DataFrame = pd.DataFrame(columns=self.COLUMN_NAMES)
         self.frames_buffer: List[FrameRecorder] = []
         self.database_name = database_name
@@ -140,16 +154,8 @@ class StreamAnalyzer:
         self.analysis_number: int
         self.create_metric_sql()
         self.set_up_sql()
-
-    @classmethod
-    def run(cls, local=True, cluster_name: str = "StreamingClusterCluster", ):
-        if local:
-            stream_url = "10.110.126.188"
-        else:
-            stream_url = get_public_ip_ecs_task(cluster_name)
-        stream_url =f"http://{stream_url}:5000/video/stream.m3u8"
-        stream_analyzer = StreamAnalyzer(stream_url=stream_url, **kwargs)
-        stream_analyzer.run_and_analyze_stream()
+        if record_params:
+            self.insert_params()
 
 
     def set_up_sql(self) -> None:
@@ -163,6 +169,27 @@ class StreamAnalyzer:
         connection.commit()
         self.set_analysis_number(cursor)
         connection.close()
+
+    def insert_params(self) -> None:
+        """
+        Sets the params in the `stream_params` table
+        """
+        print(f"SERVER URl:: {self.server_url}")
+        params = requests.get(self.server_url + "get_params")
+        params_json = params.json()
+        print(f"received params: {params}")
+        expected_params = ["CPU", "MEMORY", "IMAGE_SIZE", "FPS", "VIDEO_TYPE"]
+        values = []
+        for param in expected_params:
+            values.append(params_json[param])
+        values.append(self.analysis_number)
+        sql = "INSERT INTO stream_params (cpu, ram, image_size, fps, video_type, analysis_number) VALUES (?,?,?,?,?,?)"
+        connection = sqlite3.connect(self.database_name)
+        cursor = connection.cursor()
+        cursor.execute(sql, values)
+        connection.commit()
+        connection.close()
+
 
     def create_metric_sql(self) -> None:
         """
@@ -209,16 +236,20 @@ class StreamAnalyzer:
         while True:
             start_loop = time.time()
             ret, frame = video_capture.read()
-            self.frames_buffer.append(FrameRecorder(frame=frame, time=time.time(),
-                                                    frame_received_counter=frames_recorded_counter,
-                                                    analysis_number=self.analysis_number))
             frames_recorded_counter += 1
             if limit_frames is not None and frames_recorded_counter > limit_frames:
                 print("Ending frames recording")
                 break
-            recorder_thread = RecorderThread(frame_recorder=self.frames_buffer.pop(), db_name=self.database_name, table_name=self.table_name, no_logging=no_logging)
-            if frames_received_counter % 2 == 0:
-                recorder_thread.start()
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                frame_recorder = FrameRecorder(frame=frame, time=time.time(),
+                                                    frame_received_counter=frames_recorded_counter,
+                                                    analysis_number=self.analysis_number)
+                executor.submit(frame_recorder.process_frame, db_name=self.database_name, table_name=self.table_name)
+            # frame_recorder = FrameRecorder(frame=frame, time=time.time(),frame_received_counter=frames_recorded_counter,
+            #                                analysis_number=self.analysis_number)
+            # recorder_thread = RecorderThread(frame_recorder=frame_recorder, db_name=self.database_name, table_name=self.table_name, no_logging=no_logging)
+            # if frames_received_counter % 2 == 0:
+            #     recorder_thread.start()
             count_thread += 1
             end_loop = time.time()
             loop_time = (end_loop - start_loop) * 1000
@@ -262,5 +293,31 @@ class StreamAnalyzer:
             analyzed_data.to_csv(outfile)
 
 
+def get_parser() -> argparse.ArgumentParser:
+    time_str = "_".join(str(datetime.datetime.now()).split(" "))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-id", "--identifier", help="This identifier should be part of the container override environment variables with the key ID")
+    parser.add_argument("-l", "--logging", action="store_true", default=True, help="If not true, will not log anything to local SQLite database")
+    parser.add_argument("-ip", "--ip-address", help="Provide a manual ip address to connect to")
+    parser.add_argument("-c", "--cluster-name", default="StreamingClusterCluster", help="Provide a manual cluster")
+    parser.add_argument("-f", "--frame-limit", type=int, default=10000, help="Provide a specification for how many frames it should record, default is 10,000")
+    parser.add_argument("-o", "--outfile", default=f"data_{time_str}.csv", help="Provide a name for the file that will be output")
+    return parser
+
+def main() -> None:
+    parser = get_parser()
+    args = parser.parse_args()
+    if args.identifier:
+        public_ecs_address = get_public_ip_ecs_task_by_id(task_identifier=args.identifier, cluster_name=args.cluster_name)
+        video_url = public_ecs_address
+        record_params = True
+    if args.ip_address:
+        video_url = args.ip_address
+        record_params = False
+
+    stream_analyzer = StreamAnalyzer(ip_address=video_url, record_params=record_params)
+    stream_analyzer.run_and_analyze_stream(frame_limit=args.frame_limit, outfile=args.outfile)
+
 if __name__ == '__main__':
-    print(get_public_ip_ecs_task("StreamingClusterCluster"))
+    # print(get_public_ip_ecs_task_by_id("StreamingClusterCluster"))
+    main()

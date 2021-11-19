@@ -5,21 +5,6 @@ from typing import List
 import argparse
 import random
 
-
-def get_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--cpu", type=int, default=512, help="Specify the amount of CPU to give the task")
-    parser.add_argument("-m", "--memory", type=float, default=1.0, help="Specify the amount of memory for the given taks")
-    parser.add_argument("-f", "--fps", type=float, default=25.0, help="Give an fps amount i.e. 25.0")
-    parser.add_argument("-id", "--identifier", help="Provide a tag for the streaming task so it can be easily identified")
-    return parser
-
-def main() -> None:
-    parser = get_parser()
-    args = parser.parse_args()
-    streaming = start_run_streaming_task(**args.__dict__)
-    print(str(streaming))
-
 @dataclass
 class StackResource:
     LogicalResourceId: str
@@ -28,6 +13,7 @@ class StackResource:
     LastUpdatedTimestamp: datetime.datetime
     ResourceStatus: str
     DriftInformation: dict
+
 
 @dataclass
 class Subnet:
@@ -46,9 +32,10 @@ class Subnet:
     Ipv6CidrBlockAssociationSet: list
     SubnetArn: str
 
+
 def start_run_streaming_task(stack_name: str = "streaming", desired_az = "us-east-1a",
                              cpu: int = 512, memory: float = 1, fps: float = 25.0, image_size: int=4,
-                             video_type: str = "LIVE", identifier: str = "test") -> None:
+                             video_type: str = "LIVE", identifier: str = "test") -> dict:
     """
     Starts the task on the cluster for the task
     :param stack_name: str name of the stack
@@ -67,15 +54,13 @@ def start_run_streaming_task(stack_name: str = "streaming", desired_az = "us-eas
     if task_definition_arn is None or cluster_name is None:
         raise AssertionError(f"No task definition or no cluster found for stack {stack_name}")
     ecs_client = boto3.client("ecs")
-    env_var_override = create_aws_dict({"CPU": cpu, "MEMORY": memory, "FPS":fps, "VIDEO_TYPE":video_type, "IMAGE_SIZE":image_size})
-    tags_dict = create_aws_dict({"id":identifier})
+    env_var_override = create_aws_dict({"CPU": cpu, "MEMORY": memory, "FPS":fps, "VIDEO_TYPE":video_type, "IMAGE_SIZE":image_size, "ID":identifier})
     container_override = {"containerOverrides": [{"name": "StreamingCluster", "environment": env_var_override}]}
     run_task_response = ecs_client.run_task(cluster=cluster_name, taskDefinition=task_definition_arn, launchType="FARGATE",
-                        platformVersion="LATEST", networkConfiguration=network_configuration, overrides=container_override,
-                        tags=tags_dict, referenceId=identifier)
+                        platformVersion="LATEST", networkConfiguration=network_configuration, overrides=container_override)
     return run_task_response
 
-def create_aws_dict(python_dict: dict) -> List[dict]:
+def create_aws_dict(python_dict: dict, tags: bool=False) -> List[dict]:
     """
     :param python_dict: any python dictionary
     :return: dictionary in aws env var format like below:
@@ -86,7 +71,10 @@ def create_aws_dict(python_dict: dict) -> List[dict]:
     result = []
     for key, value in python_dict.items():
         new_key_pair = {}
-        new_key_pair['name'] = key
+        if tags:
+            new_key_pair['key'] = key
+        else:
+            new_key_pair['name'] = key
         new_key_pair['value'] = str(value)
         result.append(new_key_pair)
     return result
@@ -145,6 +133,21 @@ def stop_all_tasks_on_cluster(cluster_name: str) -> None:
     tasks = client.list_tasks(cluster=cluster_name)['taskArns']
     for taskArn in tasks:
         client.stop_task(cluster=cluster_name, task=taskArn)
+
+def get_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--cpu", type=int, default=512, help="Specify the amount of CPU to give the task")
+    parser.add_argument("-m", "--memory", type=float, default=1.0, help="Specify the amount of memory for the given taks")
+    parser.add_argument("-f", "--fps", type=float, default=25.0, help="Give an fps amount i.e. 25.0")
+    parser.add_argument("-id", "--identifier", help="Provide a tag for the streaming task so it can be easily identified")
+    return parser
+
+
+def main() -> None:
+    parser = get_parser()
+    args = parser.parse_args()
+    streaming = start_run_streaming_task(**args.__dict__)
+    print(str(streaming))
 
 if __name__ == '__main__':
     # start_run_streaming_task()

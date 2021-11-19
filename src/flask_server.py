@@ -17,7 +17,7 @@ def get_params() -> Response:
     """
     Returns params stored as environment variables
     """
-    params = ["CPU", "RAM", "FPS", "VIDEO_TYPE"]
+    params = ["CPU", "MEMORY", "IMAGE_SIZE", "FPS", "VIDEO_TYPE", "ID"]
     result_dict = {}
     for param in params:
         if param in os.environ:

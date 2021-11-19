@@ -109,9 +109,14 @@ Resources:
                 - ec2.amazonaws.com
             Action:
               - 'sts:AssumeRole'
-#      Policies:
-#        - PolicyName: AllowGetEcsPublicIP
-#          Version: "2012-10-17"
-#          Statement:
+      Policies:
+      - PolicyName: ECSAllow
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'ecs:*'
+              Resource: "*"
 
 
