@@ -135,6 +135,8 @@ class RecorderThreadExecutor(Thread):
             for frame_recorder in self.frame_recorders:
                 executor.submit(frame_recorder.process_frame, db_name=self.db_name, table_name=self.table_name)
 
+def handler(future):
+    future.result()
 
 class StreamAnalyzer:
     """
@@ -243,7 +245,8 @@ class StreamAnalyzer:
                 frame_recorder = FrameRecorder(frame=frame, time=time.time(),
                                                     frame_received_counter=frames_recorded_counter,
                                                     analysis_number=self.analysis_number)
-                executor.submit(frame_recorder.process_frame, db_name=self.database_name, table_name=self.table_name)
+                executor.submit(frame_recorder.process_frame, db_name=self.database_name, table_name=self.table_name).add_done_callback(handler)
+
                 end_loop = time.time()
                 loop_time = (end_loop - start_loop) * 1000
                 wait_time = wait_ms - loop_time

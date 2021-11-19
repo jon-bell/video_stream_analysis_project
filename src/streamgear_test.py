@@ -10,7 +10,7 @@ from typing import Dict, Tuple
 
 DEFAULT_FRAMERATE = float(os.environ.get("FPS", 25.0))
 DEFAULT_IMAGE_SIZE = 4
-os.environ['IMAGE_SIZE'] = "10"
+# os.environ['IMAGE_SIZE'] = "10"
 IMAGE_SIZE_MAP: Dict[int, Tuple[int, int]] = {
     1: (150, 150),
     2: (300, 300),

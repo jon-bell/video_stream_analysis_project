@@ -1,0 +1,6 @@
+* Want script with configurations 1 -> N number of configs
+    * each of which point towards to a specific configuration
+* Want to move all sqlite files to a shared folder
+    * Make sure they can be combined reasonably
+* Need to make sure that it waits for the fargate cluster to be provisioned
+* Plan to have this done one o clock tuesday
