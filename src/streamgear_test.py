@@ -23,6 +23,8 @@ IMAGE_SIZE_MAP: Dict[int, Tuple[int, int]] = {
     9: (1350, 1350),
     10: (1500, 1500),
 }
+
+
 IMAGE_SIZE = int(os.environ.get("IMAGE_SIZE", DEFAULT_IMAGE_SIZE))
 print(f"Image siz: {IMAGE_SIZE}")
 IMAGE_DIMENSIONS = IMAGE_SIZE_MAP[IMAGE_SIZE]

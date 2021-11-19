@@ -4,3 +4,8 @@
     * Make sure they can be combined reasonably
 * Need to make sure that it waits for the fargate cluster to be provisioned
 * Plan to have this done one o clock tuesday
+* Also implement feature for precorded video: maybe put video in an s3 bucket
+    * Gonna want to think in terms of hours
+    * One video for each image size
+* Do some 5 minutes runs to figure out minimum viable options for streaming
+* Add config for 480, 720, 1020 options (look up aspect ratios)
