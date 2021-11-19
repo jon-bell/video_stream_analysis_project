@@ -232,30 +232,25 @@ class StreamAnalyzer:
         print(f"FPS received: {fps}")
         wait_ms = int(1000/fps)
         frames_recorded_counter, frames_received_counter = 0, 0
-        count_thread = 0
-        while True:
-            start_loop = time.time()
-            ret, frame = video_capture.read()
-            frames_recorded_counter += 1
-            if limit_frames is not None and frames_recorded_counter > limit_frames:
-                print("Ending frames recording")
-                break
-            with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            while True:
+                start_loop = time.time()
+                ret, frame = video_capture.read()
+                frames_recorded_counter += 1
+                if limit_frames is not None and frames_recorded_counter > limit_frames:
+                    print("Ending frames recording")
+                    break
                 frame_recorder = FrameRecorder(frame=frame, time=time.time(),
                                                     frame_received_counter=frames_recorded_counter,
                                                     analysis_number=self.analysis_number)
                 executor.submit(frame_recorder.process_frame, db_name=self.database_name, table_name=self.table_name)
-            # frame_recorder = FrameRecorder(frame=frame, time=time.time(),frame_received_counter=frames_recorded_counter,
-            #                                analysis_number=self.analysis_number)
-            # recorder_thread = RecorderThread(frame_recorder=frame_recorder, db_name=self.database_name, table_name=self.table_name, no_logging=no_logging)
-            # if frames_received_counter % 2 == 0:
-            #     recorder_thread.start()
-            count_thread += 1
-            end_loop = time.time()
-            loop_time = (end_loop - start_loop) * 1000
-            wait_time = wait_ms - loop_time
-            print("wait ms: ", wait_time)
-            cv2.waitKey(int(wait_time))
+                end_loop = time.time()
+                loop_time = (end_loop - start_loop) * 1000
+                wait_time = wait_ms - loop_time
+                print("wait ms: ", wait_time)
+                if wait_time <= 0:
+                    continue
+                cv2.waitKey(int(wait_time))
 
     def analyze_stream(self) -> pd.DataFrame:
         """
