@@ -13,7 +13,8 @@ import argparse
 import datetime
 import requests
 
-def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str="StreamingClusterCluster") -> str:
+DEFAULT_CLUSTER = "StreamingClusterCluster"
+def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str=DEFAULT_CLUSTER) -> str:
     """
     Gets the public IP to connect to for an ecs task
     :param stack_name: name of the stack it's all deployed in... May e a better way to do this
@@ -23,16 +24,29 @@ def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str="Stream
     tasks = ecs_client.list_tasks(cluster=cluster_name)['taskArns']
     if not tasks:
         raise AssertionError(f"No tasks associated with cluster {cluster_name}")
-    task_arn = tasks # For now will just use the first one
-    task_descriptions = ecs_client.describe_tasks(tasks=task_arn, cluster=cluster_name)['tasks']
+    task_arns = tasks # For now will just use the first one
+    task_descriptions = ecs_client.describe_tasks(tasks=task_arns, cluster=cluster_name)['tasks']
     attachments = None
+    task_arn = None
     for task in task_descriptions:
         overrides_env: List[dict] = task['overrides']['containerOverrides'][0]['environment']
         for env_vars in overrides_env:
             if env_vars['name'] == "ID":
                 if env_vars['value'] == task_identifier:
                     attachments = task['attachments']
+                    task_arn = task['taskArn']
                     break
+    count_loops = 0
+    while True:
+        last_status = get_last_status(task_arn)
+        if last_status == "RUNNING":
+            break
+        else:
+            print(f"Task arn: {task_arn} is currently status {last_status} sleeping for 10 and trying again")
+            time.sleep(10)
+        count_loops += 1
+        if count_loops >= 15:
+            raise AssertionError(f"After sleeping for 150 seconds the task {task_arn}is still not running, exiting")
     if not attachments:
         raise AssertionError(f"No container found with matching ID {task_identifier}")
     eni_id = None
@@ -50,6 +64,18 @@ def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str="Stream
     network_interfaces = ec2_client.describe_network_interfaces(NetworkInterfaceIds=[eni_id])['NetworkInterfaces']
     public_ip = network_interfaces[0]['Association']['PublicIp']
     return public_ip
+
+
+def get_last_status(task_arn: str, cluster: str=DEFAULT_CLUSTER) -> str:
+    """
+    Gets the "lastStatus" of an ecs task
+    :param task_arn: str arn of the task. Can be found with `aws ecs list-tasks --cluster XXX`
+    :return: str of the lastStatus of the cluster i.e "PROVISIONING" or "RUNNING"
+    """
+    client = boto3.client("ecs")
+    task = client.describe_tasks(tasks=[task_arn], cluster=cluster)['tasks'][0]
+    last_status = task['lastStatus']
+    return last_status
 
 # DEFAULT_VIDEO_URL = "http://127.0.0.1:5000/video/stream.m3u8"
 # DEFAULT_VIDEO_URL = f"http://{get_public_ip_ecs_task()}:5000/video/stream.m3u8"
@@ -297,7 +323,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument("-id", "--identifier", help="This identifier should be part of the container override environment variables with the key ID")
     parser.add_argument("-l", "--logging", action="store_true", default=True, help="If not true, will not log anything to local SQLite database")
     parser.add_argument("-ip", "--ip-address", help="Provide a manual ip address to connect to")
-    parser.add_argument("-c", "--cluster-name", default="StreamingClusterCluster", help="Provide a manual cluster")
+    parser.add_argument("-c", "--cluster-name", default=DEFAULT_CLUSTER, help="Provide a manual cluster")
     parser.add_argument("-f", "--frame-limit", type=int, default=10000, help="Provide a specification for how many frames it should record, default is 10,000")
     parser.add_argument("-o", "--outfile", default=f"data_{time_str}.csv", help="Provide a name for the file that will be output")
     return parser
@@ -307,6 +333,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.identifier:
         public_ecs_address = get_public_ip_ecs_task_by_id(task_identifier=args.identifier, cluster_name=args.cluster_name)
+
         video_url = public_ecs_address
         record_params = True
     if args.ip_address:
@@ -314,8 +341,13 @@ def main() -> None:
         record_params = False
 
     stream_analyzer = StreamAnalyzer(ip_address=video_url, record_params=record_params)
-    stream_analyzer.run_and_analyze_stream(frame_limit=args.frame_limit, outfile=args.outfile)
-
+    try:
+        stream_analyzer.run_and_analyze_stream(frame_limit=args.frame_limit, outfile=args.outfile)
+    except ZeroDivisionError:
+        print("Received zero division error - sleeping for 15 seconds and trying again because server might still be "
+              "starting up")
+        time.sleep(15)
+        stream_analyzer.run_and_analyze_stream(frame_limit=args.frame_limit, outfile=args.outfile)
 if __name__ == '__main__':
     # print(get_public_ip_ecs_task_by_id("StreamingClusterCluster"))
     main()

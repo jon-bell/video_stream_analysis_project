@@ -31,10 +31,11 @@ class Subnet:
     AssignIpv6AddressOnCreation: bool
     Ipv6CidrBlockAssociationSet: list
     SubnetArn: str
+    EnableDns64: bool = True
 
 
 def start_run_streaming_task(stack_name: str = "streaming", desired_az = "us-east-1a",
-                             cpu: int = 512, memory: float = 1, fps: float = 25.0, image_size: int=4,
+                             cpu: int = 512, memory: float = 1, fps: float = 25.0, image_size: int=0,
                              video_type: str = "LIVE", identifier: str = "test") -> dict:
     """
     Starts the task on the cluster for the task
@@ -139,6 +140,7 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument("-c", "--cpu", type=int, default=512, help="Specify the amount of CPU to give the task")
     parser.add_argument("-m", "--memory", type=float, default=1.0, help="Specify the amount of memory for the given taks")
     parser.add_argument("-f", "--fps", type=float, default=25.0, help="Give an fps amount i.e. 25.0")
+    parser.add_argument("-i", "--image-size", type=int, default=1, help="Give a resolution from 0-3. O-3 stands for 240p, 480p, 720p, and 1080p respectively")
     parser.add_argument("-id", "--identifier", help="Provide a tag for the streaming task so it can be easily identified")
     return parser
 

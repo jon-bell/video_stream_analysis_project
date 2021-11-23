@@ -9,21 +9,15 @@ from PIL import Image
 from typing import Dict, Tuple
 
 DEFAULT_FRAMERATE = float(os.environ.get("FPS", 25.0))
-DEFAULT_IMAGE_SIZE = 4
+DEFAULT_IMAGE_SIZE = 1
 # os.environ['IMAGE_SIZE'] = "10"
-IMAGE_SIZE_MAP: Dict[int, Tuple[int, int]] = {
-    1: (150, 150),
-    2: (300, 300),
-    3: (450, 450),
-    4: (600, 600),
-    5: (750, 750),
-    6: (900, 900),
-    7: (1050, 1050),
-    8: (1200, 1200),
-    9: (1350, 1350),
-    10: (1500, 1500),
-}
 
+IMAGE_SIZE_MAP: Dict[int, Tuple[int, int]] = {
+    0: (486, 240),
+    1: (720, 480),
+    2: (1280, 720),
+    3: (1440, 1080)
+}
 
 IMAGE_SIZE = int(os.environ.get("IMAGE_SIZE", DEFAULT_IMAGE_SIZE))
 print(f"Image siz: {IMAGE_SIZE}")

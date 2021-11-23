@@ -13,7 +13,7 @@ def update_image(repository_name: str, docker_file_name: str = "Dockerfile", wor
         subprocess.call(build_docker_commmand.split())
     full_repo_address = f"{aws_ecr_address}/{repository_name}:latest"
     tag_command = f"docker tag {repository_name}:latest {full_repo_address}"
-    subprocess.call(tag_command.split())
+    subprocess.call(tag_command.split(" "))
     push_command = f"docker push {full_repo_address}"
     subprocess.call(push_command.split(" "))
 
