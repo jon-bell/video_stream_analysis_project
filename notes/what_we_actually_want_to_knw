@@ -1,0 +1,3 @@
+* FPS over a minute
+* Number of frames dropped
+* Might be able to just keep rolling info on the frames - save the frame # or something in the loop and then at each minute interval record the info

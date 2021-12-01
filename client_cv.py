@@ -113,14 +113,14 @@ class FrameRecorder:
             print(f"Frame dropped! Frame number {self.frame_received_counter}")
             cv2.imwrite(f"frame/frame_{self.frame_received_counter}.png", self.frame)
             raise e
-            return
         if no_logging:
             return
         values = original_val.replace("'", '"')
         try:
             values = json.loads(values)
         except json.decoder.JSONDecodeError:
-            return
+            return {"frame_number": -1, "frame_number_received": self.frame_received_counter, "time_generated": -1,
+                    "time_received": self.time, "analysis_number": self.analysis_number}
         frame_number = values['frame_number']
         time_generated = values['time']
         insert_sql = f"INSERT INTO {table_name}(frame_number, frame_number_received," \
@@ -131,6 +131,8 @@ class FrameRecorder:
         cursor.execute(insert_sql, values)
         connection.commit()
         connection.close()
+        values_dict = {"frame_number": frame_number, "frame_number_received": self.frame_received_counter, "time_generated": time_generated, "time_received": self.time, "analysis_number": self.analysis_number}
+        return values_dict
         # print(f"Succesfully inserted frame_number: {frame_number}")
 
 
@@ -161,8 +163,35 @@ class RecorderThreadExecutor(Thread):
             for frame_recorder in self.frame_recorders:
                 executor.submit(frame_recorder.process_frame, db_name=self.db_name, table_name=self.table_name)
 
+
+
+FRAMES_BUFFER = {}
+COUNT_FRAMES_DROPPED = 0
+
 def handler(future):
-    future.result()
+    data = future.result()
+    if data is None:
+        return
+    frame_number = data['frame_number_received']
+    FRAMES_BUFFER[frame_number] = data
+    if frame_number != 0 and frame_number - 1 in FRAMES_BUFFER:
+        calculate_statistics(FRAMES_BUFFER[frame_number-1], data)
+    if frame_number + 1 in FRAMES_BUFFER:
+        calculate_statistics(data, FRAMES_BUFFER[frame_number+1])
+    for frame in [frame_number-1, frame_number, frame_number + 1]:
+        delete_if_done(frame)
+
+def delete_if_done(frame_number):
+    neighbor_left = frame_number -1 in FRAMES_BUFFER or frame_number == 0
+    neighbor_right = frame_number + 1 in FRAMES_BUFFER
+    if neighbor_left and neighbor_right and frame_number in FRAMES_BUFFER:
+        del FRAMES_BUFFER[frame_number]
+
+def calculate_statistics(frame1, frame2):
+    global COUNT_FRAMES_DROPPED
+    if frame1['frame_number'] != frame2['frame_number'] -1:
+        COUNT_FRAMES_DROPPED += 1
+        print(f"FRAME DROPPED: {COUNT_FRAMES_DROPPED}")
 
 class StreamAnalyzer:
     """
@@ -236,6 +265,7 @@ class StreamAnalyzer:
         connection.commit()
         connection.close()
 
+
     def set_analysis_number(self, cursor: sqlite3.Cursor) -> None:
         """
         Sets an incrementing analysis number in the database. The database will store data from many differnt analysis
@@ -271,12 +301,13 @@ class StreamAnalyzer:
                 frame_recorder = FrameRecorder(frame=frame, time=time.time(),
                                                     frame_received_counter=frames_recorded_counter,
                                                     analysis_number=self.analysis_number)
-                executor.submit(frame_recorder.process_frame, db_name=self.database_name, table_name=self.table_name).add_done_callback(handler)
+
+                future = executor.submit(frame_recorder.process_frame, db_name=self.database_name, table_name=self.table_name).add_done_callback(handler)
 
                 end_loop = time.time()
                 loop_time = (end_loop - start_loop) * 1000
                 wait_time = wait_ms - loop_time
-                print("wait ms: ", wait_time)
+                # print("wait ms: ", wait_time)
                 if wait_time <= 0:
                     continue
                 cv2.waitKey(int(wait_time))

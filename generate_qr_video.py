@@ -91,5 +91,5 @@ def create_sequenced_qr_codes_in_memory(sequences: int, sleep_between_frames: fl
     return qr_codes
 
 if __name__ == '__main__':
-    generate_qr_codes_and_video("temp_files", 1000, 20, "video_test.mp4")
+    generate_qr_codes_and_video("temp_files", 10000, 25, "video_test.mp4")
     print("test!")
