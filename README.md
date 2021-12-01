@@ -5,28 +5,14 @@ the quality, reliability, and costs of different stream providers. The first ste
 between a live stream and a "control" stream. 
 
 ### Progress so far 
-So far there is a python script that generates a QR code video that contains a timestamp as well as some other metadata 
-so in theory it could be used as a first example, or overlayed onto another video and that used as an example.
-
-In addition there is a CloudFormation template for setting up an S3 bucket with a CloudFront distribution that can easily
-stream the videos.
-
-### Problems so far
-Although I'm easily able to stream another .mp4 file I downloaded from this [endpoint](https://d2ouqtwc83zphe.cloudfront.net/earth.mp4)
-I get a blank screen when I try and stream a video I generated with the QR codes [here](https://d2ouqtwc83zphe.cloudfront.net/firstVideoMp4).
-I'm not sure what the issue is here because the video I generated with QR codes works fine with VLC media player. This
-is what I'm looking into now. I'm guessing there is some nuances in openCV and video file formatting that I don't really
-understand yet.
-
-## Replicating project set up
-
-Create virtual env for python:  
-`python3 -m venv .venv`  
-Install reqs:  
-`pip3 install -r requirements.txt`  
-Generate a sample video:  
-`python3 generate_qr_video.py`  
-Assuming you are auth'd to an AWS account, create stack for infrastructure. You will want to override the default bucket name with something else:  
-`aws cloudformation --template-file bucket_setup.yaml --stack-name <YOUR STACK NAME> --parameter-overrides BucketName=<YOUR BUCKET NAME HERE>`  
-Upload file to S3:  
-`aws s3 cp <video_file_name> s3://<YOUR BUCKET NAME>/test.mp4`
+There is three major components to this project - the video server, the video client, and some additional scripts. 
+The video server generates a barcode video and streams it using a flask server. The video streaming server is configured 
+to be run in a docker container, which can most easily be run as a Fargate task. In the src folder there is an [AWS 
+Cloudformation Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html) that can be deployed
+easily. Currently will need to create one's own ECR repo however.  
+The second portion is the video receiving client. The client code is responsible for locating and receiving the video
+stream, as well as decoding the QRCode's the video stream receives and analyzing/ storing the data relevant for measuring 
+video performance.  
+The third (and least important) part of the project is the "scripts". These are some random scripts that became relevant 
+over the course of development, largely related to testing, creating QRCode videos, and automating some stuff like 
+parameter generations for the slurm inputs. 

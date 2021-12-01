@@ -3,7 +3,7 @@ FPS_OPTIONS = [15, 25, 30]
 CPU_MEMORY_CONFIGS = {512: [1, 2], 1024: [2, 3], 2048: [4]}
 VIDEO_TYPE = ["LIVE", "PRERECORDED"]
 
-file = open("slurm_inputs.txt", "w")
+file = open("../video_client/slurm_inputs.txt", "w")
 task_count = 0
 for image_size in IMAGE_SIZES:
     for fps in FPS_OPTIONS:

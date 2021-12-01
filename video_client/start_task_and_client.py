@@ -1,7 +1,7 @@
 import copy
 
-from start_stop_streaming import start_run_streaming_task
-from client_cv import StreamAnalyzer, get_public_ip_ecs_task_by_id, DEFAULT_CLUSTER
+from video_client.start_stop_streaming import start_run_streaming_task
+from video_client.client_cv import StreamAnalyzer, get_public_ip_ecs_task_by_id, DEFAULT_CLUSTER
 import argparse
 
 def get_parser() -> argparse.ArgumentParser:

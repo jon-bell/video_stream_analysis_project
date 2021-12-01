@@ -17,7 +17,7 @@ def generate_qr_codes_and_video(destination_folder: str, sequences, fps, video_n
     :param fps: the fps of the video. So the length of the video will be (1/fps) * sequences
     """
     if not os.path.exists(destination_folder):
-        os.mkdir("temp_files")
+        os.mkdir("../temp_files")
     destination_folder = "temp_files"
     time_between_frames = 60 / fps * 60
     create_sequenced_qr_codes(sequences, "qr_codes", destination_folder, sleep_between_frames=time_between_frames)

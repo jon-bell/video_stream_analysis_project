@@ -1,6 +1,10 @@
 import boto3
+import time
 from typing import List
-def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str="StreamingClusterCluster") -> str:
+
+DEFAULT_CLUSTER = "StreamingClusterCluster"
+
+def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str=DEFAULT_CLUSTER) -> str:
     """
     Gets the public IP to connect to for an ecs task
     :param stack_name: name of the stack it's all deployed in... May e a better way to do this
@@ -10,16 +14,29 @@ def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str="Stream
     tasks = ecs_client.list_tasks(cluster=cluster_name)['taskArns']
     if not tasks:
         raise AssertionError(f"No tasks associated with cluster {cluster_name}")
-    task_arn = tasks # For now will just use the first one
-    task_descriptions = ecs_client.describe_tasks(tasks=task_arn, cluster=cluster_name)['tasks']
+    task_arns = tasks # For now will just use the first one
+    task_descriptions = ecs_client.describe_tasks(tasks=task_arns, cluster=cluster_name)['tasks']
     attachments = None
+    task_arn = None
     for task in task_descriptions:
         overrides_env: List[dict] = task['overrides']['containerOverrides'][0]['environment']
         for env_vars in overrides_env:
             if env_vars['name'] == "ID":
                 if env_vars['value'] == task_identifier:
                     attachments = task['attachments']
+                    task_arn = task['taskArn']
                     break
+    count_loops = 0
+    while True:
+        last_status = get_last_status(task_arn)
+        if last_status == "RUNNING":
+            break
+        else:
+            print(f"Task arn: {task_arn} is currently status {last_status} sleeping for 10 and trying again")
+            time.sleep(10)
+        count_loops += 1
+        if count_loops >= 15:
+            raise AssertionError(f"After sleeping for 150 seconds the task {task_arn} is still not running, exiting")
     if not attachments:
         raise AssertionError(f"No container found with matching ID {task_identifier}")
     eni_id = None
@@ -38,5 +55,15 @@ def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str="Stream
     public_ip = network_interfaces[0]['Association']['PublicIp']
     return public_ip
 
-if __name__ == '__main__':
-    print(get_public_ip_ecs_task_by_id("test1"))
+
+def get_last_status(task_arn: str, cluster: str=DEFAULT_CLUSTER) -> str:
+    """
+    Gets the "lastStatus" of an ecs task
+    :param cluster: Name of the cluster that the task exists in
+    :param task_arn: str arn of the task. Can be found with `aws ecs list-tasks --cluster XXX`
+    :return: str of the lastStatus of the cluster i.e "PROVISIONING" or "RUNNING"
+    """
+    client = boto3.client("ecs")
+    task = client.describe_tasks(tasks=[task_arn], cluster=cluster)['tasks'][0]
+    last_status = task['lastStatus']
+    return last_status

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 import datetime
 from typing import List
 import argparse
-import random
 
 @dataclass
 class StackResource:
@@ -152,6 +151,4 @@ def main() -> None:
     print(str(streaming))
 
 if __name__ == '__main__':
-    # start_run_streaming_task()
-    # # stop_all_tasks_on_cluster("StreamingClusterCluster")
     main()
