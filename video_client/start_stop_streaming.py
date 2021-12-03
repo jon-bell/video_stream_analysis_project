@@ -4,6 +4,7 @@ import datetime
 from typing import List
 import argparse
 
+
 @dataclass
 class StackResource:
     LogicalResourceId: str

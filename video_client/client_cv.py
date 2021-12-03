@@ -8,7 +8,7 @@ import argparse
 import datetime
 import requests
 from aws_utils import get_public_ip_ecs_task_by_id, DEFAULT_CLUSTER
-from frame_recorder import FrameRecorder
+from frame_recorder import FrameRecorder, FrameDict
 
 new_url = "10.110.126.188"
 DEFAULT_VIDEO_URL = f"http://{new_url}:5000/video/stream.m3u8"
@@ -16,13 +16,17 @@ DEFAULT_VIDEO_URL = f"http://{new_url}:5000/video/stream.m3u8"
 # Global variables
 FRAMES_BUFFER = {}
 COUNT_FRAMES_DROPPED = 0
+ROLLING_LATENCY = []
+CALCULATED_FPS = []
+FRAMES_COUNTED = 0
+PROCESSED_FRAMES = set()
 
 
 def handler(future):
-    data = future.result()
+    data: FrameDict = future.result()
     if data is None:
         return
-    frame_number = data['frame_number_received']
+    frame_number = data.frame_number_received
     FRAMES_BUFFER[frame_number] = data
     if frame_number != 0 and frame_number - 1 in FRAMES_BUFFER:
         calculate_statistics(FRAMES_BUFFER[frame_number - 1], data)
@@ -30,6 +34,23 @@ def handler(future):
         calculate_statistics(data, FRAMES_BUFFER[frame_number + 1])
     for frame in [frame_number - 1, frame_number, frame_number + 1]:
         delete_if_done(frame)
+        delete_trailing_frame_buffers(frame_number)
+
+def delete_trailing_frame_buffers(frame_number: int, trailing_period: int = 20) -> None:
+    """
+    This attempts to remove old frames from frame buffer, without interfering with anything
+    :param trailing_period:
+    :return:
+    """
+    frame_cutoff = frame_number - trailing_period
+    if frame_cutoff < 0:
+        return
+    frame_numbers = list(FRAMES_BUFFER.keys())
+    for frame_number in frame_numbers:
+        if frame_number <= frame_cutoff:
+            del FRAMES_BUFFER[frame_number]
+
+
 
 
 def delete_if_done(frame_number):
@@ -39,12 +60,30 @@ def delete_if_done(frame_number):
         del FRAMES_BUFFER[frame_number]
 
 
-def calculate_statistics(frame1, frame2):
+def calculate_statistics(frame1: FrameDict, frame2: FrameDict):
     global COUNT_FRAMES_DROPPED
-    if frame1['frame_number'] != frame2['frame_number'] - 1:
+    global ROLLING_LATENCY
+    global CALCULATED_FPS
+    global FRAMES_COUNTED
+    if frame1.frame_number == frame2.frame_number_received:
+        print("Identical frame numbers, skipping")
+        return
+    if frame1.frame_number != frame2.frame_number - 1:
         COUNT_FRAMES_DROPPED += 1
-        print(f"FRAME DROPPED: {COUNT_FRAMES_DROPPED}")
+    difference_between_frame_times = frame2.time_received - frame1.time_received
+    calculated_fps = 1000 / (difference_between_frame_times * 1000)
+    CALCULATED_FPS.append(calculated_fps)
+    latency = frame1.time_received - frame1.time_generated
+    FRAMES_COUNTED += 1
+    if not frame1.is_error_frame():
+        ROLLING_LATENCY.append(latency)
 
+def print_state():
+    print(f"size frame buffer: {len(FRAMES_BUFFER)}")
+    if FRAMES_COUNTED != 0:
+        fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
+        latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
+        print(f"Total fps: {fps} Total Latency: {latency}")
 
 class StreamAnalyzer:
     """
@@ -64,8 +103,43 @@ class StreamAnalyzer:
         self.analysis_number: int
         self.create_metric_sql()
         self.set_up_sql()
+        self.create_final_sql_table()
         if record_params:
             self.insert_params()
+
+    def create_final_sql_table(self) -> None:
+        """
+        Sets up sql table meant to store the "final" data on video quality and analysis. The stats will be stored once
+        every minute and will calculate stats such as rolling latency, frames dropped over the last minute, calculated
+        FPS over that minute, maybe something else?
+        """
+        create_table_sql = "CREATE TABLE IF NOT EXISTS stream_data_final (minute_count INT," \
+                           "frames_received INT, frames_dropped INT, avg_calculated_fps FLOAT, avg_calculated_latency FLOAT, analysis_number INT)"
+        connection = sqlite3.connect(self.database_name)
+        cursor = connection.cursor()
+        cursor.execute(create_table_sql)
+        connection.commit()
+        connection.close()
+
+    def record_summary_statistics(self, minute_count: int) -> None:
+        global ROLLING_LATENCY
+        global CALCULATED_FPS
+        global COUNT_FRAMES_DROPPED
+        global FRAMES_COUNTED
+        fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
+        latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
+        sql = "INSERT INTO stream_data_final (minute_count, frames_dropped, avg_calculated_fps, avg_calculated_latency, analysis_number) VALUES (?,?,?,?,?)"
+        values = [minute_count, COUNT_FRAMES_DROPPED, fps, latency, self.analysis_number]
+        connection = sqlite3.connect(self.database_name)
+        cursor = connection.cursor()
+        cursor.execute(sql, values)
+        connection.commit()
+        connection.close()
+        ROLLING_LATENCY = []
+        CALCULATED_FPS = []
+        COUNT_FRAMES_DROPPED = 0
+        FRAMES_COUNTED = 0
+
 
     def set_up_sql(self) -> None:
         """
@@ -139,6 +213,8 @@ class StreamAnalyzer:
         print(f"FPS received: {fps}")
         wait_ms = int(1000 / fps)
         frames_recorded_counter, frames_received_counter = 0, 0
+        time_last_data_record = time.time()
+        minute_count = 0
         with ThreadPoolExecutor(max_workers=10) as executor:
             while True:
                 start_loop = time.time()
@@ -153,6 +229,13 @@ class StreamAnalyzer:
 
                 future = executor.submit(frame_recorder.process_frame, db_name=self.database_name,
                                          table_name=self.table_name).add_done_callback(handler)
+                minute_has_passed = time.time() - time_last_data_record >= 10
+                if minute_has_passed:
+                    print("A minute has passed since the last time a frame was recorded")
+                    print_state()
+                    self.record_summary_statistics(minute_count)
+                    minute_count += 1
+                    time_last_data_record = time.time()
 
                 end_loop = time.time()
                 loop_time = (end_loop - start_loop) * 1000
@@ -197,7 +280,6 @@ class StreamAnalyzer:
         if outfile is not None:
             analyzed_data.to_csv(outfile)
 
-
 def get_parser() -> argparse.ArgumentParser:
     time_str = "_".join(str(datetime.datetime.now()).split(" "))
     parser = argparse.ArgumentParser()
@@ -220,7 +302,6 @@ def main() -> None:
     if args.identifier:
         public_ecs_address = get_public_ip_ecs_task_by_id(task_identifier=args.identifier,
                                                           cluster_name=args.cluster_name)
-
         video_url = public_ecs_address
         record_params = True
     if args.ip_address:
@@ -235,6 +316,11 @@ def main() -> None:
               "starting up")
         time.sleep(15)
         stream_analyzer.run_and_analyze_stream(frame_limit=args.frame_limit, outfile=args.outfile)
+    except cv2.error:
+        print("Received cv2 error, attempting to connect again after 2s")
+        time.sleep(2)
+        stream_analyzer.run_and_analyze_stream(frame_limit=args.frame_limit, outfile=args.outfile)
+
 
 
 if __name__ == '__main__':
