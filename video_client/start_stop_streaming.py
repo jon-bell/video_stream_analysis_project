@@ -35,7 +35,7 @@ class Subnet:
 
 
 def start_run_streaming_task(stack_name: str = "streaming", desired_az = "us-east-1a",
-                             cpu: int = 512, memory: float = 1, fps: float = 25.0, image_size: int=0,
+                             cpu: int = 512, memory: int = 1, fps: float = 25.0, image_size: int=0,
                              video_type: str = "LIVE", identifier: str = "test") -> dict:
     """
     Starts the task on the cluster for the task
@@ -56,7 +56,7 @@ def start_run_streaming_task(stack_name: str = "streaming", desired_az = "us-eas
         raise AssertionError(f"No task definition or no cluster found for stack {stack_name}")
     ecs_client = boto3.client("ecs")
     env_var_override = create_aws_dict({"CPU": cpu, "MEMORY": memory, "FPS":fps, "VIDEO_TYPE":video_type, "IMAGE_SIZE":image_size, "ID":identifier})
-    container_override = {"containerOverrides": [{"name": "StreamingCluster", "environment": env_var_override}]}
+    container_override = {"cpu": str(cpu), "memory": str(memory)+"GB", "containerOverrides": [{"name": "StreamingCluster", "environment": env_var_override}]}
     run_task_response = ecs_client.run_task(cluster=cluster_name, taskDefinition=task_definition_arn, launchType="FARGATE",
                         platformVersion="LATEST", networkConfiguration=network_configuration, overrides=container_override)
     return run_task_response
@@ -138,7 +138,7 @@ def stop_all_tasks_on_cluster(cluster_name: str) -> None:
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--cpu", type=int, default=512, help="Specify the amount of CPU to give the task")
-    parser.add_argument("-m", "--memory", type=float, default=1.0, help="Specify the amount of memory for the given taks")
+    parser.add_argument("-m", "--memory", type=int, default=1, help="Specify the amount of memory for the given taks")
     parser.add_argument("-f", "--fps", type=float, default=25.0, help="Give an fps amount i.e. 25.0")
     parser.add_argument("-i", "--image-size", type=int, default=1, help="Give a resolution from 0-3. O-3 stands for 240p, 480p, 720p, and 1080p respectively")
     parser.add_argument("-id", "--identifier", help="Provide a tag for the streaming task so it can be easily identified")

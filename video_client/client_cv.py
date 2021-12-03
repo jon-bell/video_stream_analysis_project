@@ -94,7 +94,7 @@ class StreamAnalyzer:
                     "random"]
 
     def __init__(self, ip_address: str = DEFAULT_VIDEO_URL, database_name="stream_data.db",
-                 table_name: str = "stream_data", port: int = 5000, record_params: bool = True):
+                 table_name: str = "stream_data", port: int = 5000, record_params: bool = True, record_period_seconds: int = 60):
         self.server_url = f"http://{ip_address}:{port}/"
         self.stream_url = self.server_url + "video/stream.m3u8"
         self.video_log: pd.DataFrame = pd.DataFrame(columns=self.COLUMN_NAMES)
@@ -104,6 +104,7 @@ class StreamAnalyzer:
         self.create_metric_sql()
         self.set_up_sql()
         self.create_final_sql_table()
+        self.record_period_seconds = record_period_seconds
         if record_params:
             self.insert_params()
 
@@ -229,9 +230,9 @@ class StreamAnalyzer:
 
                 future = executor.submit(frame_recorder.process_frame, db_name=self.database_name,
                                          table_name=self.table_name).add_done_callback(handler)
-                minute_has_passed = time.time() - time_last_data_record >= 10
-                if minute_has_passed:
-                    print("A minute has passed since the last time a frame was recorded")
+                record_period_passed = time.time() - time_last_data_record >= self.record_period_seconds
+                if record_period_passed:
+                    print(f"{self.record_period_seconds} has passed since the last time a frame was recorded, recording now")
                     print_state()
                     self.record_summary_statistics(minute_count)
                     minute_count += 1
@@ -240,7 +241,7 @@ class StreamAnalyzer:
                 end_loop = time.time()
                 loop_time = (end_loop - start_loop) * 1000
                 wait_time = wait_ms - loop_time
-                print("wait ms: ", wait_time)
+                # print("wait ms: ", wait_time)
                 if wait_time <= 0:
                     continue
                 cv2.waitKey(int(wait_time))
