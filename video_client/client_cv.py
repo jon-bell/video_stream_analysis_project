@@ -94,7 +94,7 @@ class StreamAnalyzer:
                     "random"]
 
     def __init__(self, ip_address: str = DEFAULT_VIDEO_URL, database_name="stream_data.db",
-                 table_name: str = "stream_data", port: int = 5000, record_params: bool = True, record_period_seconds: int = 60):
+                 table_name: str = "stream_data", port: int = 5000, record_params: bool = True, record_period_seconds: int = 10):
         self.server_url = f"http://{ip_address}:{port}/"
         self.stream_url = self.server_url + "video/stream.m3u8"
         self.video_log: pd.DataFrame = pd.DataFrame(columns=self.COLUMN_NAMES)
