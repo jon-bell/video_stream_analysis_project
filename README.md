@@ -18,7 +18,7 @@ over the course of development, largely related to testing, creating QRCode vide
 parameter generations for the slurm inputs. 
 
 ## Steps to put this into one's own AWS account
-1. Create ECR repo called `fargate-stream`
+1. Create private ECR repo called `fargate-stream`
 2. Clone current repo, and build `dockerfile.opencv`, follow [these instructions](https://docs.aws.amazon.com/AmazonECR/latest/userguide/docker-push-ecr-image.html)
 to build and push to ECR repo
 3. In the file `fargate_cluster.yaml` replace the parameters "Image" and "VPCId" with values that match your own accounts.
