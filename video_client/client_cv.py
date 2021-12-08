@@ -71,8 +71,10 @@ def calculate_statistics(frame1: FrameDict, frame2: FrameDict):
     if frame1.frame_number != frame2.frame_number - 1:
         COUNT_FRAMES_DROPPED += 1
     difference_between_frame_times = frame2.time_received - frame1.time_received
-    calculated_fps = 1000 / (difference_between_frame_times * 1000)
-    CALCULATED_FPS.append(calculated_fps)
+    if difference_between_frame_times != 0:
+        calculated_fps = 1 / difference_between_frame_times
+        if calculated_fps <= 100:
+            CALCULATED_FPS.append(calculated_fps)
     latency = frame1.time_received - frame1.time_generated
     FRAMES_COUNTED += 1
     if not frame1.is_error_frame():
@@ -81,10 +83,12 @@ def calculate_statistics(frame1: FrameDict, frame2: FrameDict):
 def print_state():
     print(f"size frame buffer: {len(FRAMES_BUFFER)}")
     if FRAMES_COUNTED != 0:
-        fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
-        latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
-        print(f"Total fps: {fps} Total Latency: {latency}")
-
+        try:
+            fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
+            latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
+            print(f"Total fps: {fps} Total Latency: {latency}")
+        except ZeroDivisionError as e:
+            return
 class StreamAnalyzer:
     """
     This class absorbs a netowork stream and analyzes it for metrics like FPS, frame counts, time lag

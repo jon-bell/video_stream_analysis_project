@@ -16,3 +16,14 @@ video performance.
 The third (and least important) part of the project is the "scripts". These are some random scripts that became relevant 
 over the course of development, largely related to testing, creating QRCode videos, and automating some stuff like 
 parameter generations for the slurm inputs. 
+
+## Steps to put this into one's own AWS account
+1. Create ECR repo called `fargate-stream`
+2. Clone current repo, and build `dockerfile.opencv`, follow [these instructions](https://docs.aws.amazon.com/AmazonECR/latest/userguide/docker-push-ecr-image.html)
+to build and push to ECR repo
+3. In the file `fargate_cluster.yaml` replace the parameters "Image" and "VPCId" with values that match your own accounts.
+The "Image" parameter should be the same besides replacing with your own AWS Account ID, the VPCId you will have to find and choose your own.
+I found mine by running the command `aws ec2 describe-vpcs`, and chose the first option, since I only have one VPC.
+4. Now the stack should be ready to be deployed! Run `aws cloudformation deploy --template-file fargate_cluster.yaml --stack-name streaming`
+5. If this works without issue we should be able to launch tasks from the cluster, try `python start_task_and_client --id test1` and see if
+you can launch a task and start streaming the video!
