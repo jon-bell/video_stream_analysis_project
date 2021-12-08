@@ -108,6 +108,8 @@ def get_network_configuration(stack_name: str, desired_az: str = "us-east-1a") -
     subnets = ec2_client.describe_subnets()['Subnets']
     subnet_id = None
     for subnet in subnets:
+        if 'IPv6Native' in subnet:
+            del subnet['IPv6Native']
         subnet = Subnet(**subnet)
         if subnet.AvailabilityZone == desired_az:
             subnet_id = subnet.SubnetId
