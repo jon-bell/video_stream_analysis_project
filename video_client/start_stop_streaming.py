@@ -110,9 +110,8 @@ def get_network_configuration(stack_name: str, desired_az: str = "us-east-1a") -
     for subnet in subnets:
         if 'Ipv6Native' in subnet:
             del subnet['Ipv6Native']
-        subnet = Subnet(**subnet)
-        if subnet.AvailabilityZone == desired_az:
-            subnet_id = subnet.SubnetId
+        if subnet["AvailabilityZone"] == desired_az:
+            subnet_id = subnet["SubnetId"]
     if subnet_id is None:
         raise AssertionError("Not able to find AZ zone")
     result_dict['awsvpcConfiguration']['subnets'].append(subnet_id)
