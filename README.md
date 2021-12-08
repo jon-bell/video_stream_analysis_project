@@ -36,4 +36,5 @@ you can launch a task and start streaming the video!
 * EC2 Full access
 * Cloudformation Full access  
 Though it is definitely possible to restrict further. From there I grabbed the ID and Secrete ID and set them as env variables
-on the target server.
+on the target server.  
+3. For running the tests, the inputs are stored in a file called `slurm_inputs.txt` and consumed by `slurm_wrapper.sh` which should feed those inputs cleanly into `start_task_and_client.py`
