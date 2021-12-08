@@ -27,3 +27,13 @@ I found mine by running the command `aws ec2 describe-vpcs`, and chose the first
 4. Now the stack should be ready to be deployed! Run `aws cloudformation deploy --template-file fargate_cluster.yaml --stack-name streaming`
 5. If this works without issue we should be able to launch tasks from the cluster, try `python start_task_and_client --id test1` and see if
 you can launch a task and start streaming the video!
+
+## Running tests using this 
+1. I assume that you will just use a main dev/ root/ general role to deploy the above cloudformation stack
+2. To run the client code you will need to put an IAM role on a server with restricted permissions. I made an IAM user with the following permissions:
+* ECS Full access
+* IAM full access
+* EC2 Full access
+* Cloudformation Full access  
+Though it is definitely possible to restrict further. From there I grabbed the ID and Secrete ID and set them as env variables
+on the target server.
