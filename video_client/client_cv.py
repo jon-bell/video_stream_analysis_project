@@ -85,6 +85,7 @@ def print_state(record_period_serconds: int):
     if FRAMES_COUNTED != 0:
         try:
             fps = FRAMES_COUNTED / record_period_serconds
+            print(f"FRAMES_COUTED: {FRAMES_BUFFER} RECORD_PERIOD {record_period_serconds}")
             latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
             print(f"Total fps: {fps} Total Latency: {latency}")
         except ZeroDivisionError as e:

@@ -35,8 +35,8 @@ def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str=DEFAULT
             print(f"Task arn: {task_arn} is currently status {last_status} sleeping for 10 and trying again")
             time.sleep(10)
         count_loops += 1
-        if count_loops >= 15:
-            raise AssertionError(f"After sleeping for 150 seconds the task {task_arn} is still not running, exiting")
+        if count_loops >= 20:
+            raise AssertionError(f"After sleeping for 200 seconds the task {task_arn} is still not running, exiting")
     if not attachments:
         raise AssertionError(f"No container found with matching ID {task_identifier}")
     eni_id = None
