@@ -27,6 +27,8 @@ def main() -> None:
     print("Task started - sleeping for 30 seconds")
     time.sleep(30)
     public_ecs_address = get_public_ip_ecs_task_by_id(task_identifier=args.identifier, cluster_name=args.cluster_name)
+    print("Public IP address found, sleeping another 30")
+    time.sleep(40)
     stream_analyzer = StreamAnalyzer(ip_address=public_ecs_address, record_params=True)
     stream_analyzer.get_stream_record_frames(args.frame_limit)
 
