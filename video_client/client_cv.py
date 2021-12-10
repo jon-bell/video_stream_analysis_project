@@ -147,7 +147,6 @@ class StreamAnalyzer:
         connection.commit()
         connection.close()
         ROLLING_LATENCY = []
-        CALCULATED_FPS = []
         COUNT_FRAMES_DROPPED = 0
         FRAMES_COUNTED = 0
 
