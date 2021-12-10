@@ -1,6 +1,5 @@
 import copy
 import time
-
 from start_stop_streaming import start_run_streaming_task
 from client_cv import StreamAnalyzer, get_public_ip_ecs_task_by_id, DEFAULT_CLUSTER
 import argparse
@@ -25,9 +24,11 @@ def main() -> None:
     del streaming_args['frame_limit']
     del streaming_args['cluster_name']
     streaming = start_run_streaming_task(**streaming_args)
-    print("Task started - sleeping for 10 seconds")
-    time.sleep(10)
+    print("Task started - sleeping for 30 seconds")
+    time.sleep(30)
     public_ecs_address = get_public_ip_ecs_task_by_id(task_identifier=args.identifier, cluster_name=args.cluster_name)
+    print("Public IP address found, sleeping another 30")
+    time.sleep(40)
     stream_analyzer = StreamAnalyzer(ip_address=public_ecs_address, record_params=True)
     stream_analyzer.get_stream_record_frames(args.frame_limit)
 

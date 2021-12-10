@@ -80,11 +80,12 @@ def calculate_statistics(frame1: FrameDict, frame2: FrameDict):
     if not frame1.is_error_frame():
         ROLLING_LATENCY.append(latency)
 
-def print_state():
+def print_state(record_period_serconds: int):
     print(f"size frame buffer: {len(FRAMES_BUFFER)}")
     if FRAMES_COUNTED != 0:
         try:
-            fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
+            fps = FRAMES_COUNTED / record_period_serconds
+            print(f"FRAMES_COUTED: {FRAMES_COUNTED} RECORD_PERIOD {record_period_serconds}")
             latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
             print(f"Total fps: {fps} Total Latency: {latency}")
         except ZeroDivisionError as e:
@@ -126,13 +127,19 @@ class StreamAnalyzer:
         connection.commit()
         connection.close()
 
-    def record_summary_statistics(self, minute_count: int) -> None:
+    def record_summary_statistics(self, minute_count: int, recording_time_period: int) -> None:
         global ROLLING_LATENCY
         global CALCULATED_FPS
         global COUNT_FRAMES_DROPPED
         global FRAMES_COUNTED
-        fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
-        latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
+        try:
+            fps = FRAMES_COUNTED / recording_time_period
+        except ZeroDivisionError as e:
+            fps = 0
+        try:
+            latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
+        except ZeroDivisionError as e:
+            latency = 0
         sql = "INSERT INTO stream_data_final (minute_count, frames_dropped, avg_calculated_fps, avg_calculated_latency, analysis_number) VALUES (?,?,?,?,?)"
         values = [minute_count, COUNT_FRAMES_DROPPED, fps, latency, self.analysis_number]
         connection = sqlite3.connect(self.database_name)
@@ -141,7 +148,6 @@ class StreamAnalyzer:
         connection.commit()
         connection.close()
         ROLLING_LATENCY = []
-        CALCULATED_FPS = []
         COUNT_FRAMES_DROPPED = 0
         FRAMES_COUNTED = 0
 
@@ -237,8 +243,9 @@ class StreamAnalyzer:
                 record_period_passed = time.time() - time_last_data_record >= self.record_period_seconds
                 if record_period_passed:
                     print(f"{self.record_period_seconds} has passed since the last time a frame was recorded, recording now")
-                    print_state()
-                    self.record_summary_statistics(minute_count)
+                    print(f"Updated calculated FPS: {FRAMES_COUNTED / self.record_period_seconds}")
+                    print_state(self.record_period_seconds)
+                    self.record_summary_statistics(minute_count, self.record_period_seconds)
                     minute_count += 1
                     time_last_data_record = time.time()
 
