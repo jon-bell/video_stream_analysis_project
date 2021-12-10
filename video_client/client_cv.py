@@ -131,8 +131,14 @@ class StreamAnalyzer:
         global CALCULATED_FPS
         global COUNT_FRAMES_DROPPED
         global FRAMES_COUNTED
-        fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
-        latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
+        try:
+            fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
+        except ZeroDivisionError as e:
+            fps = 0
+        try:
+            latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
+        except ZeroDivisionError as e:
+            latency = 0
         sql = "INSERT INTO stream_data_final (minute_count, frames_dropped, avg_calculated_fps, avg_calculated_latency, analysis_number) VALUES (?,?,?,?,?)"
         values = [minute_count, COUNT_FRAMES_DROPPED, fps, latency, self.analysis_number]
         connection = sqlite3.connect(self.database_name)
@@ -237,6 +243,7 @@ class StreamAnalyzer:
                 record_period_passed = time.time() - time_last_data_record >= self.record_period_seconds
                 if record_period_passed:
                     print(f"{self.record_period_seconds} has passed since the last time a frame was recorded, recording now")
+                    print(f"Updated calculated FPS: {FRAMES_COUNTED / self.record_period_seconds}")
                     print_state()
                     self.record_summary_statistics(minute_count)
                     minute_count += 1
