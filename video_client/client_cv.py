@@ -80,11 +80,11 @@ def calculate_statistics(frame1: FrameDict, frame2: FrameDict):
     if not frame1.is_error_frame():
         ROLLING_LATENCY.append(latency)
 
-def print_state():
+def print_state(record_period_serconds: int):
     print(f"size frame buffer: {len(FRAMES_BUFFER)}")
     if FRAMES_COUNTED != 0:
         try:
-            fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
+            fps = FRAMES_COUNTED / record_period_serconds
             latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
             print(f"Total fps: {fps} Total Latency: {latency}")
         except ZeroDivisionError as e:
@@ -126,13 +126,13 @@ class StreamAnalyzer:
         connection.commit()
         connection.close()
 
-    def record_summary_statistics(self, minute_count: int) -> None:
+    def record_summary_statistics(self, minute_count: int, recording_time_period: int) -> None:
         global ROLLING_LATENCY
         global CALCULATED_FPS
         global COUNT_FRAMES_DROPPED
         global FRAMES_COUNTED
         try:
-            fps = sum(CALCULATED_FPS) / len(CALCULATED_FPS)
+            fps = FRAMES_COUNTED / recording_time_period
         except ZeroDivisionError as e:
             fps = 0
         try:
@@ -243,8 +243,8 @@ class StreamAnalyzer:
                 if record_period_passed:
                     print(f"{self.record_period_seconds} has passed since the last time a frame was recorded, recording now")
                     print(f"Updated calculated FPS: {FRAMES_COUNTED / self.record_period_seconds}")
-                    print_state()
-                    self.record_summary_statistics(minute_count)
+                    print_state(self.record_period_seconds)
+                    self.record_summary_statistics(minute_count, self.record_period_seconds)
                     minute_count += 1
                     time_last_data_record = time.time()
 
