@@ -70,4 +70,4 @@ class StreamThread(threading.Thread):
         print("Stream has ended")
 
 if __name__ == '__main__':
-    start_stream(framerate=15.0)
+    start_stream()
