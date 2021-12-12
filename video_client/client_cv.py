@@ -30,7 +30,7 @@ def handler(future):
     FRAMES_BUFFER[frame_number] = data
     if frame_number != 0 and frame_number - 1 in FRAMES_BUFFER:
         calculate_statistics(FRAMES_BUFFER[frame_number - 1], data)
-    if frame_number + 1 in FRAMES_BUFFER:
+    elif frame_number + 1 in FRAMES_BUFFER:
         calculate_statistics(data, FRAMES_BUFFER[frame_number + 1])
     for frame in [frame_number - 1, frame_number, frame_number + 1]:
         delete_if_done(frame)
