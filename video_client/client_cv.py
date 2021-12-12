@@ -223,6 +223,7 @@ class StreamAnalyzer:
         fps = video_capture.get(cv2.CAP_PROP_FPS)
         print(f"FPS received: {fps}")
         wait_ms = int(1000 / fps)
+        print(f"WAIT MS: {wait_ms}")
         frames_recorded_counter, frames_received_counter = 0, 0
         time_last_data_record = time.time()
         minute_count = 0
@@ -252,7 +253,7 @@ class StreamAnalyzer:
                 end_loop = time.time()
                 loop_time = (end_loop - start_loop) * 1000
                 wait_time = wait_ms - loop_time
-                # print("wait ms: ", wait_time)
+                print("wait ms: ", wait_time)
                 if wait_time <= 0:
                     continue
                 cv2.waitKey(int(wait_time))
