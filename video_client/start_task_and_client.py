@@ -3,6 +3,7 @@ import time
 from start_stop_streaming import start_run_streaming_task
 from client_cv import StreamAnalyzer, get_public_ip_ecs_task_by_id, DEFAULT_CLUSTER
 import argparse
+from aws_utils import stop_task_by_id
 
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
@@ -31,6 +32,13 @@ def main() -> None:
     time.sleep(40)
     stream_analyzer = StreamAnalyzer(ip_address=public_ecs_address, record_params=True)
     stream_analyzer.get_stream_record_frames(args.frame_limit)
+    stop_task_by_id(task_identifier=args.identifier, cluster_name=args.cluster_name)
+
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        args = get_parser().parse_args()
+        stop_task_by_id(task_identifier=args.identifier, cluster_name=args.cluster_name)
+        print("Task stopped")
