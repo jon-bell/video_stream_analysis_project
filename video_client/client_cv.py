@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import argparse
 import datetime
 import requests
-from aws_utils import get_public_ip_ecs_task_by_id, DEFAULT_CLUSTER
+from aws_utils import get_public_ip_ecs_task_by_id, DEFAULT_CLUSTER, stop_task_by_id
 from frame_recorder import FrameRecorder, FrameDict
 
 new_url = "10.110.126.188"
@@ -80,16 +80,17 @@ def calculate_statistics(frame1: FrameDict, frame2: FrameDict):
     if not frame1.is_error_frame():
         ROLLING_LATENCY.append(latency)
 
-def print_state(record_period_serconds: int):
+def print_state(record_period_serconds: int, frames_counter: int):
     print(f"size frame buffer: {len(FRAMES_BUFFER)}")
     if FRAMES_COUNTED != 0:
         try:
-            fps = FRAMES_COUNTED / record_period_serconds
+            fps = frames_counter / record_period_serconds
             print(f"FRAMES_COUTED: {FRAMES_COUNTED} RECORD_PERIOD {record_period_serconds}")
             latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
             print(f"Total fps: {fps} Total Latency: {latency}")
         except ZeroDivisionError as e:
             return
+
 class StreamAnalyzer:
     """
     This class absorbs a netowork stream and analyzes it for metrics like FPS, frame counts, time lag
@@ -127,19 +128,20 @@ class StreamAnalyzer:
         connection.commit()
         connection.close()
 
-    def record_summary_statistics(self, minute_count: int, recording_time_period: int) -> None:
+    def record_summary_statistics(self, minute_count: int, recording_time_period: int, frames_counter: int) -> None:
         global ROLLING_LATENCY
         global CALCULATED_FPS
         global COUNT_FRAMES_DROPPED
         global FRAMES_COUNTED
         try:
-            fps = FRAMES_COUNTED / recording_time_period
+            fps = frames_counter / recording_time_period
         except ZeroDivisionError as e:
             fps = 0
         try:
             latency = sum(ROLLING_LATENCY) / len(ROLLING_LATENCY)
         except ZeroDivisionError as e:
             latency = 0
+        print(f"NRE FPS: {fps}")
         sql = "INSERT INTO stream_data_final (minute_count, frames_dropped, avg_calculated_fps, avg_calculated_latency, analysis_number) VALUES (?,?,?,?,?)"
         values = [minute_count, COUNT_FRAMES_DROPPED, fps, latency, self.analysis_number]
         connection = sqlite3.connect(self.database_name)
@@ -221,16 +223,17 @@ class StreamAnalyzer:
         """
         video_capture = cv2.VideoCapture(self.stream_url)
         fps = video_capture.get(cv2.CAP_PROP_FPS)
-        print(f"FPS received: {fps}")
         wait_ms = int(1000 / fps)
         frames_recorded_counter, frames_received_counter = 0, 0
         time_last_data_record = time.time()
         minute_count = 0
+        cur_frames = 0
         with ThreadPoolExecutor(max_workers=10) as executor:
             while True:
                 start_loop = time.time()
                 ret, frame = video_capture.read()
                 frames_recorded_counter += 1
+                cur_frames += 1
                 if limit_frames is not None and frames_recorded_counter > limit_frames:
                     print("Ending frames recording")
                     break
@@ -243,16 +246,14 @@ class StreamAnalyzer:
                 record_period_passed = time.time() - time_last_data_record >= self.record_period_seconds
                 if record_period_passed:
                     print(f"{self.record_period_seconds} has passed since the last time a frame was recorded, recording now")
-                    print(f"Updated calculated FPS: {FRAMES_COUNTED / self.record_period_seconds}")
-                    print_state(self.record_period_seconds)
-                    self.record_summary_statistics(minute_count, self.record_period_seconds)
+                    print_state(self.record_period_seconds, cur_frames)
+                    self.record_summary_statistics(minute_count, self.record_period_seconds, cur_frames)
                     minute_count += 1
                     time_last_data_record = time.time()
-
+                    cur_frames = 0
                 end_loop = time.time()
                 loop_time = (end_loop - start_loop) * 1000
                 wait_time = wait_ms - loop_time
-                # print("wait ms: ", wait_time)
                 if wait_time <= 0:
                     continue
                 cv2.waitKey(int(wait_time))
@@ -332,6 +333,11 @@ def main() -> None:
         print("Received cv2 error, attempting to connect again after 2s")
         time.sleep(2)
         stream_analyzer.run_and_analyze_stream(frame_limit=args.frame_limit, outfile=args.outfile)
+    except KeyboardInterrupt:
+        stop_task_by_id(task_identifier=args.identifier, cluster_name=args.cluster_name)
+        print("Task stopped")
+    stop_task_by_id(task_identifier=args.identifier, cluster_name=args.cluster_name)
+    print("Task stopped")
 
 
 

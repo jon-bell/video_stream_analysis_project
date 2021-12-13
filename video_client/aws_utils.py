@@ -56,6 +56,28 @@ def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str=DEFAULT
     return public_ip
 
 
+def stop_task_by_id(task_identifier: str, cluster_name: str=DEFAULT_CLUSTER) -> dict:
+    ecs_client = boto3.client("ecs")
+    task_arn = get_task_arn_by_id(task_identifier=task_identifier, cluster_name=cluster_name)
+    return ecs_client.stop_task(cluster=cluster_name, task=task_arn)
+
+
+def get_task_arn_by_id(task_identifier: str, cluster_name: str) -> str:
+    ecs_client = boto3.client("ecs")
+    tasks = ecs_client.list_tasks(cluster=cluster_name)['taskArns']
+    if not tasks:
+        raise AssertionError(f"No tasks associated with cluster {cluster_name}")
+    task_arns = tasks # For now will just use the first one
+    task_descriptions = ecs_client.describe_tasks(tasks=task_arns, cluster=cluster_name)['tasks']
+    for task in task_descriptions:
+        overrides_env: List[dict] = task['overrides']['containerOverrides'][0]['environment']
+        for env_vars in overrides_env:
+            if env_vars['name'] == "ID":
+                if env_vars['value'] == task_identifier:
+                    return task['taskArn']
+    raise AssertionError(f"No task with container with ENV ID = {task_identifier}")
+
+
 def get_last_status(task_arn: str, cluster: str=DEFAULT_CLUSTER) -> str:
     """
     Gets the "lastStatus" of an ecs task
