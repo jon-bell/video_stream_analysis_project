@@ -59,7 +59,7 @@ def get_public_ip_ecs_task_by_id(task_identifier: str, cluster_name: str=DEFAULT
 def stop_task_by_id(task_identifier: str, cluster_name: str=DEFAULT_CLUSTER) -> dict:
     ecs_client = boto3.client("ecs")
     task_arn = get_task_arn_by_id(task_identifier=task_identifier, cluster_name=cluster_name)
-    return ecs_client.stop_client(cluster=cluster_name, task=task_arn)
+    return ecs_client.stop_task(cluster=cluster_name, task=task_arn)
 
 
 def get_task_arn_by_id(task_identifier: str, cluster_name: str) -> str:
