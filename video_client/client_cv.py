@@ -244,6 +244,7 @@ class StreamAnalyzer:
                 future = executor.submit(frame_recorder.process_frame, db_name=self.database_name,
                                          table_name=self.table_name).add_done_callback(handler)
                 record_period_passed = time.time() - time_last_data_record >= self.record_period_seconds
+                time_start = time.time()
                 if record_period_passed:
                     print(f"{self.record_period_seconds} has passed since the last time a frame was recorded, recording now")
                     print(f"Updated calculated FPS: {FRAMES_COUNTED / self.record_period_seconds}")
@@ -252,6 +253,9 @@ class StreamAnalyzer:
                     minute_count += 1
                     time_last_data_record = time.time()
                     cur_frames = 0
+                    time_end = time.time()
+                    time_diff = time_end - time_start
+                    print(f"TIME TO RECORD: {time_diff}")
 
                 end_loop = time.time()
                 loop_time = (end_loop - start_loop) * 1000
