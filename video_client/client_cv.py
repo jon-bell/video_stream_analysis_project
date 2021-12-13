@@ -256,7 +256,7 @@ class StreamAnalyzer:
                 end_loop = time.time()
                 loop_time = (end_loop - start_loop) * 1000
                 wait_time = wait_ms - loop_time
-                print(f"FRAME PROCESSED THIS CYCLE: {cur_frames} WAIT MS" {wait_ms})
+                print(f"FRAME PROCESSED THIS CYCLE: {cur_frames} WAIT MS {wait_ms}")
                 if wait_time <= 0:
                     continue
                 cv2.waitKey(int(wait_time))
